@@ -1,0 +1,1 @@
+extend-diff-ignore = "^nasl/nasl_grammar[.](output|tab.c|tab.h)$"

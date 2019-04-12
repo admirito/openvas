@@ -1,0 +1,24 @@
+Source: openvas-scanner
+Section: admin
+Priority: optional
+Maintainer: Mohammad Razavi <mrazavi64@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), po-debconf, doxygen, xmltoman, cmake, pkg-config, libglib2.0-dev, libgcrypt11-dev, libgnutls28-dev, libpcap-dev, libgpgme-dev, libssh-dev, libksba-dev, bison, flex, libgvm-dev
+Standards-Version: 4.1.4
+Homepage: http://www.openvas.org/
+
+Package: openvas-scanner
+Architecture: any
+Pre-Depends: gnutls-bin (>= 3.0.11)
+Depends: lsb-base, ${shlibs:Depends}, ${misc:Depends}
+Recommends: redis-server, nmap, rsync, curl
+Conflicts: openvas9-scanner, libopenvas9, libopenvas9-dev
+Description: remote network security auditor - scanner
+ The Greenbone Vulnerability Management Solution (previously known as
+ Open Vulnerability Assessment System) is a modular security auditing tool,
+ used for testing remote systems for vulnerabilities that should be fixed.
+ .
+ It is made up of several parts: a manager i.e. the main server gvmd.
+ A scanner openvas-scanner that execute vulnerability checking scripts.
+ A  web interface called Greenbone Security Assistant gsad.
+ .
+ This package contains the scanner (openvas-scanner) part.

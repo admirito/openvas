@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+. /usr/share/debconf/confmodule
+
+if ! grep -q "#Added by openvas-scanner" /etc/redis/redis.conf; then
+    db_input high openvas-scanner/enable_redis || true
+fi
+
+db_go
+
+exit 0
