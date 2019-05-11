@@ -1,4 +1,4 @@
-openvas-scanner (6.0.0-1) bionic; urgency=medium
+openvas-scanner (6.0.0-3) bionic; urgency=medium
 
   * Initial release (imported upstream version 6.0.0)
 
