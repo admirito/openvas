@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for openvas-scanner
+# postinst script for openvas
 #
 # see: dh_installdeb(1)
 
@@ -22,12 +22,12 @@ case "$1" in
     configure)
 	if [ -e /usr/share/debconf/confmodule ]; then
 	    . /usr/share/debconf/confmodule
-	    db_get openvas-scanner/enable_redis
+	    db_get openvas/enable_redis
 	    if [ "$RET" = "true" ]; then
 		if [ ! -f /etc/redis/redis.conf ]; then
 		    echo "/etc/redis/redis.conf doesn't exist. Please configure redis unix socket manually."
 		else
-		    ((grep -q "^\s*unixsocket\s\+" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas-scanner post installation\nunixsocket /var/run/redis/redis.sock" /etc/redis/redis.conf) && grep -q "^\s*unixsocketperm" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas-scanner post installation\nunixsocketperm 755" /etc/redis/redis.conf) && invoke-rc.d --quiet redis-server restart || true
+		    ((grep -q "^\s*unixsocket\s\+" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocket /var/run/redis/redis.sock" /etc/redis/redis.conf) && grep -q "^\s*unixsocketperm" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocketperm 755" /etc/redis/redis.conf) && invoke-rc.d --quiet redis-server restart || true
 		fi
 	    fi
 	fi

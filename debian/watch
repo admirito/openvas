@@ -1,5 +1,5 @@
 version=3
 
 opts=uversionmangle=s/\+beta/~beta/ \
-https://github.com/greenbone/openvas-scanner/tags  \
+https://github.com/greenbone/openvas/tags  \
         .*/archive/v(.*)\.tar\.gz
