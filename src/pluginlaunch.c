@@ -75,20 +75,6 @@ static int old_max_running_processes;
 static GSList *non_simult_ports = NULL;
 const char *hostname = NULL;
 
-static void
-cleanup_process_children (kb_t kb, pid_t pid)
-{
-  char key[128];
-  pid_t child;
-
-  snprintf (key, sizeof (key), "internal/child/%d", pid);
-  child = kb_item_get_int (kb, key);
-  if (child > 0)
-    {
-      g_warning ("Terminating leftover child process %d", child);
-      terminate_process (child);
-    }
-}
 /**
  *
  */
@@ -108,6 +94,7 @@ update_running_processes (kb_t kb)
       if (processes[i].pid > 0)
         {
           int is_alive = process_alive (processes[i].pid);
+          int ret_terminate = 0;
 
           // If process dead or timed out
           if (!is_alive
@@ -117,13 +104,6 @@ update_running_processes (kb_t kb)
             {
               char *oid = processes[i].plugin->oid;
 
-              if (prefs_get_bool ("advanced_log"))
-                {
-                  char buf[2048], buf2[2048];
-                  snprintf (buf, sizeof (buf), "log/launched/%s/end", oid);
-                  snprintf (buf2, sizeof (buf2), "%lu", time (NULL));
-                  kb_item_add_str (kb, buf, buf2, 0);
-                }
               if (is_alive)
                 {
                   char msg[2048];
@@ -131,8 +111,6 @@ update_running_processes (kb_t kb)
                   if (log_whole)
                     g_message ("%s (pid %d) is slow to finish - killing it",
                                oid, processes[i].pid);
-                  if (prefs_get_bool ("advanced_log"))
-                    kb_item_add_str (kb, "log/timedout", oid, 0);
 
                   sprintf (msg,
                            "ERRMSG||| |||general/tcp|||%s|||"
@@ -140,7 +118,14 @@ update_running_processes (kb_t kb)
                            oid ?: " ", processes[i].timeout);
                   kb_item_push_str (kb, "internal/results", msg);
 
-                  terminate_process (processes[i].pid);
+                  ret_terminate = terminate_process (processes[i].pid);
+                  if (ret_terminate == 0)
+                    {
+                      terminate_process (processes[i].pid * -1);
+                      num_running_processes--;
+                      processes[i].plugin->running_state = PLUGIN_STATUS_DONE;
+                      bzero (&(processes[i]), sizeof (processes[i]));
+                    }
                 }
               else
                 {
@@ -168,11 +153,12 @@ update_running_processes (kb_t kb)
                       e = waitpid (processes[i].pid, NULL, 0);
                     }
                   while (e < 0 && errno == EINTR);
+
+                  terminate_process (processes[i].pid * -1);
+                  num_running_processes--;
+                  processes[i].plugin->running_state = PLUGIN_STATUS_DONE;
+                  bzero (&(processes[i]), sizeof (processes[i]));
                 }
-              num_running_processes--;
-              processes[i].plugin->running_state = PLUGIN_STATUS_DONE;
-              cleanup_process_children (kb, processes[i].pid);
-              bzero (&(processes[i]), sizeof (processes[i]));
             }
         }
     }
@@ -291,7 +277,7 @@ pluginlaunch_init (const char *host)
   if (max_running_processes >= MAX_PROCESSES)
     {
       g_debug ("max_checks (%d) > MAX_PROCESSES (%d) - modify "
-               "openvas-scanner/openvassd/pluginlaunch.c",
+               "openvas/openvas/pluginlaunch.c",
                max_running_processes, MAX_PROCESSES);
       max_running_processes = MAX_PROCESSES - 1;
     }
@@ -313,30 +299,40 @@ pluginlaunch_enable_parallel_checks (void)
 }
 
 void
-pluginlaunch_stop (int soft_stop)
+pluginlaunch_stop ()
 {
   int i;
-
-  if (soft_stop)
-    {
-      for (i = 0; i < MAX_PROCESSES; i++)
-        {
-          if (processes[i].pid > 0)
-            kill (processes[i].pid, SIGTERM);
-        }
-      usleep (20000);
-    }
 
   for (i = 0; i < MAX_PROCESSES; i++)
     {
       if (processes[i].pid > 0)
         {
-          kill (processes[i].pid, SIGKILL);
+          terminate_process (processes[i].pid * -1);
           num_running_processes--;
           processes[i].plugin->running_state = PLUGIN_STATUS_DONE;
           bzero (&(processes[i]), sizeof (struct running));
         }
     }
+}
+
+static int
+plugin_timeout (nvti_t *nvti)
+{
+  int timeout;
+
+  assert (nvti);
+  timeout = prefs_nvt_timeout (nvti_oid (nvti));
+  if (timeout == 0)
+    timeout = nvti_timeout (nvti);
+  if (timeout == 0)
+    {
+      if (nvti_category (nvti) == ACT_SCANNER)
+        timeout =
+          atoi (prefs_get ("scanner_plugins_timeout")) ?: SCANNER_NVT_TIMEOUT;
+      else
+        timeout = atoi (prefs_get ("plugins_timeout")) ?: NVT_TIMEOUT;
+    }
+  return timeout;
 }
 
 /**
@@ -355,19 +351,7 @@ plugin_launch (struct scan_globals *globals, struct scheduler_plugin *plugin,
   if (p < 0)
     return -1;
   processes[p].plugin = plugin;
-  processes[p].timeout = prefs_nvt_timeout (plugin->oid);
-  if (processes[p].timeout == 0)
-    processes[p].timeout = nvti_timeout (nvti);
-
-  if (processes[p].timeout == 0)
-    {
-      if (nvti_category (nvti) == ACT_SCANNER)
-        processes[p].timeout =
-          atoi (prefs_get ("scanner_plugins_timeout") ?: "-1");
-      else
-        processes[p].timeout = atoi (prefs_get ("plugins_timeout") ?: "-1");
-    }
-
+  processes[p].timeout = plugin_timeout (nvti);
   gettimeofday (&(processes[p].start), NULL);
   processes[p].pid = nasl_plugin_launch (globals, ip, vhosts, kb, plugin->oid);
 

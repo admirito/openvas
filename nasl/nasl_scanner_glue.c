@@ -18,10 +18,10 @@
 
 /**
  * @file nasl_scanner_glue.c
- * @brief glue between openvassd and nasl scripts.
+ * @brief glue between openvas and nasl scripts.
  *
  * This file contains all the functions that make the "glue" between
- * as NASL script and openvassd.
+ * as NASL script and openvas.
  * (script_*(), *kb*(), scanner_*())
  */
 
@@ -102,9 +102,6 @@ script_oid (lex_ctxt *lexic)
   return FAKE_CELL;
 }
 
-/*
- * TODO: support multiple CVE entries
- */
 tree_cell *
 script_cve_id (lex_ctxt *lexic)
 {
@@ -114,16 +111,13 @@ script_cve_id (lex_ctxt *lexic)
 
   for (i = 0; cve != NULL; i++)
     {
-      nvti_add_cve (script_infos->nvti, cve);
+      nvti_add_vtref (script_infos->nvti, vtref_new ("cve", cve, ""));
       cve = get_str_var_by_num (lexic, i + 1);
     }
 
   return FAKE_CELL;
 }
 
-/*
- * TODO: support multiple bugtraq entries
- */
 tree_cell *
 script_bugtraq_id (lex_ctxt *lexic)
 {
@@ -133,24 +127,56 @@ script_bugtraq_id (lex_ctxt *lexic)
 
   for (i = 0; bid != NULL; i++)
     {
-      nvti_add_bid (script_infos->nvti, bid);
+      nvti_add_vtref (script_infos->nvti, vtref_new ("bid", bid, ""));
       bid = get_str_var_by_num (lexic, i + 1);
     }
 
   return FAKE_CELL;
 }
 
+/**
+ * @brief Add a cross reference to the meta data.
+ *
+ * The parameter "name" of the command defines actually
+ * the type, for example "URL" or "OSVDB".
+ * The parameter "value" is the actual reference.
+ * Alternative to "value", "csv" can be used with a
+ * list of comma-separated values.
+ *
+ * In fact, if name is "cve" or "bid", it is equivalent
+ * to call script_cve_id() or script_bugtraq_id(), for example
+ * script_cve_id ("CVE-2019-12345");
+ * is identical to
+ * script_xref (name: "cve", value: "CVE-2019-12345");
+ *
+ * And also:
+ * script_bugtraq_id (12345);
+ * is identical to
+ * script_xref (name: "bid", value: "12345");
+ * (watch out that the number now needs to be a string).
+ *
+ * This even works with multiple comma-separated elements like
+ * script_xref (name: "cve", csv: "CVE-2019-12345,CVE-2019-54321");
+ *
+ * @param lexic The parser context.
+ *
+ * @return Always FAKE_CELL.
+ */
 tree_cell *
 script_xref (lex_ctxt *lexic)
 {
   struct script_infos *script_infos = lexic->script_infos;
   char *name = get_str_var_by_name (lexic, "name");
   char *value = get_str_var_by_name (lexic, "value");
+  char *csv = get_str_var_by_name (lexic, "csv");
 
-  if (value == NULL || name == NULL)
+  if (((value == NULL) && (csv == NULL)) || name == NULL)
     {
-      nasl_perror (lexic, "script_xref() syntax error - should be"
-                          " script_xref(name:<name>, value:<value>)\n");
+      nasl_perror (lexic,
+                   "script_xref() syntax error - should be"
+                   " script_xref(name:<name>, value:<value>) or"
+                   " script_xref(name:<name>, value:<value>, csv:<CSVs>) or"
+                   " script_xref(name:<name>, csv:<CSVs>)\n");
       if (name == NULL)
         {
           nasl_perror (lexic, "  <name> is empty\n");
@@ -159,18 +185,23 @@ script_xref (lex_ctxt *lexic)
         {
           nasl_perror (lexic, "  <name> is %s\n", name);
         }
-      if (value == NULL)
+      if ((value == NULL) && (csv == NULL))
         {
-          nasl_perror (lexic, "  <value> is empty)\n");
+          nasl_perror (lexic, "  <value> and <csv> is empty)\n");
         }
       else
         {
           nasl_perror (lexic, "  <value> is %s\n)", value);
+          nasl_perror (lexic, "  <csv> is %s\n)", csv);
         }
       return FAKE_CELL;
     }
 
-  plug_set_xref (script_infos, name, value);
+  if (csv)
+    nvti_add_refs (script_infos->nvti, name, csv, "");
+
+  if (value)
+    nvti_add_vtref (script_infos->nvti, vtref_new (name, value, ""));
 
   return FAKE_CELL;
 }
@@ -210,7 +241,7 @@ script_tag (lex_ctxt *lexic)
       nasl_perror (lexic, "%s tag contains | separator", name);
       return FAKE_CELL;
     }
-  plug_set_tag (script_infos, name, value);
+  nvti_add_tag (script_infos->nvti, name, value);
 
   return FAKE_CELL;
 }
@@ -417,19 +448,35 @@ script_require_udp_ports (lex_ctxt *lexic)
 tree_cell *
 script_add_preference (lex_ctxt *lexic)
 {
+  int id = get_int_var_by_name (lexic, "id", -1);
   char *name = get_str_var_by_name (lexic, "name");
   char *type = get_str_var_by_name (lexic, "type");
   char *value = get_str_var_by_name (lexic, "value");
   struct script_infos *script_infos = lexic->script_infos;
+  nvtpref_t *np;
+  unsigned int i;
 
-  if (name == NULL || type == NULL || value == NULL)
+  if (!script_infos->nvti)
+    return FAKE_CELL;
+  if (id <= 0)
+    id = nvti_pref_len (script_infos->nvti) + 1;
+  if (!name || !type || !value)
     {
       nasl_perror (lexic,
                    "Argument error in the call to script_add_preference()\n");
+      return FAKE_CELL;
     }
-  else
-    add_plugin_preference (script_infos, name, type, value);
+  for (i = 0; i < nvti_pref_len (script_infos->nvti); i++)
+    {
+      if (!strcmp (name, nvtpref_name (nvti_pref (script_infos->nvti, i))))
+        {
+          nasl_perror (lexic, "Preference '%s' already exists\n", name);
+          return FAKE_CELL;
+        }
+    }
 
+  np = nvtpref_new (id, name, type, value);
+  nvti_add_pref (script_infos->nvti, np);
   return FAKE_CELL;
 }
 
@@ -452,12 +499,9 @@ script_get_preference (lex_ctxt *lexic)
   value = get_plugin_preference (lexic->oid, pref);
   if (value != NULL)
     {
-      retc = alloc_tree_cell ();
+      retc = alloc_typed_cell (CONST_INT);
       if (isalldigit (value, strlen (value)))
-        {
-          retc->type = CONST_INT;
-          retc->x.i_val = atoi (value);
-        }
+        retc->x.i_val = atoi (value);
       else
         {
           retc->type = CONST_DATA;
@@ -508,8 +552,7 @@ script_get_preference_file_content (lex_ctxt *lexic)
       return NULL;
     }
 
-  retc = alloc_tree_cell ();
-  retc->type = CONST_DATA;
+  retc = alloc_typed_cell (CONST_DATA);
   retc->size = contentsize;
   retc->x.str_val = content;
 
@@ -559,9 +602,8 @@ tree_cell *
 safe_checks (lex_ctxt *lexic)
 {
   (void) lexic;
-  tree_cell *retc = alloc_tree_cell ();
+  tree_cell *retc = alloc_typed_cell (CONST_INT);
 
-  retc->type = CONST_INT;
   retc->x.i_val = prefs_get_bool ("safe_checks");
 
   return retc;
@@ -573,9 +615,8 @@ scan_phase (lex_ctxt *lexic)
   struct script_infos *script_infos = lexic->script_infos;
   struct scan_globals *globals = script_infos->globals;
   char *value;
-  tree_cell *retc = alloc_tree_cell ();
+  tree_cell *retc = alloc_typed_cell (CONST_INT);
 
-  retc->type = CONST_INT;
   value = globals->network_scan_status;
   if (value)
     {
@@ -656,8 +697,7 @@ get_kb_list (lex_ctxt *lexic)
   if (kb == NULL)
     return NULL;
 
-  retc = alloc_tree_cell ();
-  retc->type = DYN_ARRAY;
+  retc = alloc_typed_cell (DYN_ARRAY);
   retc->x.ref_val = a = g_malloc0 (sizeof (nasl_array));
 
   if (strchr (kb_mask, '*'))
@@ -717,10 +757,9 @@ get_kb_item (lex_ctxt *lexic)
   if (val == NULL && type == -1)
     return NULL;
 
-  retc = alloc_tree_cell ();
+  retc = alloc_typed_cell (CONST_INT);
   if (type == KB_TYPE_INT)
     {
-      retc->type = CONST_INT;
       retc->x.i_val = GPOINTER_TO_SIZE (val);
       g_free (val);
       return retc;
@@ -830,12 +869,12 @@ set_kb_item (lex_ctxt *lexic)
 /*------------------------[ Reporting a problem ]---------------------------*/
 
 /**
- * Function is used when the script wants to report a problem back to openvassd.
+ * Function is used when the script wants to report a problem back to openvas.
  */
 typedef void (*proto_post_something_t) (const char *, struct script_infos *,
                                         int, const char *, const char *);
 /**
- * Function is used when the script wants to report a problem back to openvassd.
+ * Function is used when the script wants to report a problem back to openvas.
  */
 typedef void (*post_something_t) (const char *, struct script_infos *, int,
                                   const char *);
@@ -999,8 +1038,7 @@ nasl_scanner_get_port (lex_ctxt *lexic)
       return NULL;
     }
 
-  retc = alloc_tree_cell ();
-  retc->type = CONST_INT;
+  retc = alloc_typed_cell (CONST_INT);
   retc->x.i_val = ports[idx];
   return retc;
 }

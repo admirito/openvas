@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Copyright (C) 2019 Greenbone Networks GmbH
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -17,41 +17,15 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-/**
- * @file scanneraux.h
- * @brief Auxiliary structures for scanner.
+/*
+ * @file openvas.h
+ * @brief Headers for OpenVAS entry point.
  */
 
-#ifndef _OPENVAS_SCANNERAUX_H
-#define _OPENVAS_SCANNERAUX_H
+#ifndef _OPENVAS_H
+#define _OPENVAS_H
 
-#include <glib.h>
-#include <gvm/base/nvti.h>
-#include <gvm/util/kb.h>
+int
+openvas (int, char **);
 
-struct scan_globals
-{
-  char *network_targets;
-  char *network_scan_status;
-  GHashTable *files_translation;
-  GHashTable *files_size_translation;
-  char *scan_id;
-};
-
-struct host_info;
-
-struct script_infos
-{
-  struct scan_globals *globals;
-  kb_t key;
-  nvti_t *nvti;
-  char *oid;
-  char *name;
-  GHashTable *udp_data;
-  struct in6_addr *ip;
-  GSList *vhosts;
-  int standalone;
-  int denial_port;
-  int alive;
-};
-#endif /* not _OPENVAS_SCANNERAUX_H */
+#endif /* not _OPENVAS_H */

@@ -29,11 +29,6 @@
 #include <sys/types.h> /* for pid_t */
 
 int
-is_otp_scan (void);
-void
-set_scan_type (int);
-
-int
 get_max_hosts_number (void);
 
 int
@@ -50,7 +45,7 @@ wait_for_children1 (void);
 int
 is_scanner_only_pref (const char *);
 
-void
-send_printf (int, char *, ...) __attribute__ ((format (printf, 2, 3)));
+int
+store_file (struct scan_globals *, const char *, const char *);
 
 #endif

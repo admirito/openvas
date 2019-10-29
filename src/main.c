@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Copyright (C) 2009-2018 Greenbone Networks GmbH
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -18,24 +18,24 @@
  */
 
 /**
- * @file otp.h
- * @brief Protos for OpenVAS Transfer Protocol.
+ * @file  main.c
+ * @brief Main function of openvas.
+ *
+ * This file separates out the "main" function of openvas.
  */
 
-#ifndef _OTP_H
-#define _OTP_H
+#include "openvas.h"
 
-typedef enum
+/**
+ * @brief Main function.
+ *
+ * @param[in]  argc  The number of arguments in argv.
+ * @param[in]  argv  The list of arguments to the program.
+ *
+ * @return EXIT_SUCCESS on success, EXIT_FAILURE on failure.
+ */
+int
+main (int argc, char **argv)
 {
-  CREQ_UNKNOWN,
-  CREQ_ATTACHED_FILE,
-  CREQ_LONG_ATTACK,
-  CREQ_PREFERENCES,
-  CREQ_STOP_WHOLE_TEST,
-  CREQ_NVT_INFO,
-} client_request_t;
-
-client_request_t
-otp_get_client_request (char *);
-
-#endif
+  return openvas (argc, argv);
+}

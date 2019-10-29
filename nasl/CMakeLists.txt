@@ -21,7 +21,7 @@
 ## Project version
 # The following three variables should be set through the project command once
 # we require CMake >= 3.0
-set (NASL_VERSION_MAJOR 10)
+set (NASL_VERSION_MAJOR 11)
 set (NASL_VERSION_MINOR 0)
 set (NASL_VERSION_PATCH 0)
 
@@ -44,11 +44,11 @@ endif (NOT PKG_CONFIG_FOUND)
 pkg_check_modules (GLIB REQUIRED glib-2.0>=2.42)
 pkg_check_modules (GIO REQUIRED gio-2.0)
 pkg_check_modules (GNUTLS REQUIRED gnutls>=3.2.15)
-pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=10.0.0)
-pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=10.0.0)
+pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=11.0.0)
+pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=11.0.0)
 
-pkg_check_modules (OPENVAS_WMICLIENT libopenvas_wmiclient>=1.0.4)
-pkg_check_modules (OPENVAS_WINCMD libopenvas_wincmd>=1.0.4)
+pkg_check_modules (OPENVAS_WMICLIENT libopenvas_wmiclient>=1.0.5)
+pkg_check_modules (OPENVAS_WINCMD libopenvas_wincmd>=1.0.5)
 
 
 # for 'nasl' binary
@@ -121,6 +121,7 @@ else (NOT GCRYPT)
   if (GCRYPT_VERSION VERSION_LESS "1.6")
     message (SEND_ERROR "libgcrypt 1.6 or greater is required")
   endif (GCRYPT_VERSION VERSION_LESS "1.6")
+  string(REPLACE "-I" "" GCRYPT_INCLUDE_DIRS "${GCRYPT_CFLAGS}")
 endif (NOT GCRYPT)
 
 
@@ -179,9 +180,9 @@ if (KSBA)
   add_definitions (-DHAVE_LIBKSBA)
 endif (KSBA)
 
-if (OPENVASSD_CONF)
-  add_definitions (-DOPENVASSD_CONF="${OPENVASSD_CONF}")
-endif (OPENVASSD_CONF)
+if (OPENVAS_CONF)
+  add_definitions (-DOPENVAS_CONF="${OPENVAS_CONF}")
+endif (OPENVAS_CONF)
 
 set_source_files_properties (nasl_grammar.tab.c GENERATED)
 
@@ -196,7 +197,8 @@ include_directories (${GLIB_INCLUDE_DIRS}
                      ${LIBSSH_INCLUDE_DIRS}
                      ${LIBGVM_BASE_INCLUDE_DIRS}
                      ${LIBGVM_UTIL_INCLUDE_DIRS}
-                     ${KSBA_INCLUDE_DIRS})
+                     ${KSBA_INCLUDE_DIRS}
+                     ${GCRYPT_INCLUDE_DIRS})
 
 
 # Build shared 

@@ -44,12 +44,6 @@ void
 plug_set_dep (struct script_infos *, const char *);
 
 void
-plug_set_xref (struct script_infos *, char *, char *);
-
-void
-plug_set_tag (struct script_infos *, char *, char *);
-
-void
 plug_set_ssl_cert (struct script_infos *, char *);
 
 void
@@ -158,9 +152,6 @@ plug_get_host_ip (struct script_infos *);
 char *
 plug_get_host_ip_str (struct script_infos *);
 
-void
-add_plugin_preference (struct script_infos *, const char *, const char *,
-                       const char *);
 char *
 get_plugin_preference (const char *, const char *);
 

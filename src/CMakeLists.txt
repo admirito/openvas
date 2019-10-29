@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2018 Greenbone Networks GmbH
+# Copyright (C) 2011-2019 Greenbone Networks GmbH
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -26,8 +26,8 @@ if (NOT PKG_CONFIG_FOUND)
   message(FATAL_ERROR "pkg-config executable not found. Aborting.")
 endif (NOT PKG_CONFIG_FOUND)
 
-pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=1.0.0)
-pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=1.0.0)
+pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=11.0.0)
+pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=11.0.0)
 pkg_check_modules (GLIB REQUIRED glib-2.0>=2.42)
 
 # set NVTICACHE_STR with version.
@@ -55,19 +55,21 @@ else (NOT GCRYPT)
   if (GCRYPT_VERSION VERSION_LESS "1.6")
     message (SEND_ERROR "libgcrypt 1.6 or greater is required")
   endif (GCRYPT_VERSION VERSION_LESS "1.6")
+  string(REPLACE "-I" "" GCRYPT_INCLUDE_DIRS "${GCRYPT_CFLAGS}")
 endif (NOT GCRYPT)
 
-add_executable (openvassd attack.c comm.c hosts.c
-                nasl_plugins.c ntp.c openvassd.c otp.c
+add_executable (openvas attack.c hosts.c
+                main.c nasl_plugins.c openvas.c
                 pluginlaunch.c pluginload.c
                 pluginscheduler.c plugs_req.c
                 processes.c sighand.c utils.c)
 
-set_target_properties (openvassd PROPERTIES LINKER_LANGUAGE C)
+set_target_properties (openvas PROPERTIES LINKER_LANGUAGE C)
 
 include_directories (${GLIB_INCLUDE_DIRS} ${LIBOPENVAS_NASL_INCLUDE_DIRS}
                      ${LIBGVM_BASE_INCLUDE_DIRS}
-                     ${LIBOPENVAS_MISC_INCLUDE_DIRS})
+                     ${LIBOPENVAS_MISC_INCLUDE_DIRS}
+                     ${GCRYPT_INCLUDE_DIRS})
 
 if (NOT CMAKE_BUILD_TYPE MATCHES "Release")
   # If we got GIT_REVISION at configure time,
@@ -82,7 +84,7 @@ if (NOT CMAKE_BUILD_TYPE MATCHES "Release")
                         -P ${CMAKE_SOURCE_DIR}/cmake/GetGit.cmake)
 
     # explicitly say that the executable depends on custom target
-    add_dependencies (openvassd revisiontag)
+    add_dependencies (openvas revisiontag)
 
     # include the output directory, where the gitversion.h file is generated
     include_directories (${CMAKE_CURRENT_BINARY_DIR})
@@ -92,9 +94,9 @@ endif (NOT CMAKE_BUILD_TYPE MATCHES "Release")
 
 set (CMAKE_C_FLAGS_DEBUG        "${CMAKE_C_FLAGS_DEBUG} -Werror -Wextra")
 
-if (OPENVASSD_VERSION)
-  add_definitions (-DOPENVASSD_VERSION="${OPENVASSD_VERSION}")
-endif (OPENVASSD_VERSION)
+if (OPENVAS_VERSION)
+  add_definitions (-DOPENVAS_VERSION="${OPENVAS_VERSION}")
+endif (OPENVAS_VERSION)
 
 add_definitions (-DPREFIX="${CMAKE_INSTALL_PREFIX}")
 
@@ -102,9 +104,9 @@ if (OPENVAS_NVT_DIR)
   add_definitions (-DOPENVAS_NVT_DIR="${OPENVAS_NVT_DIR}")
 endif (OPENVAS_NVT_DIR)
 
-if (OPENVASSD_CONF)
-  add_definitions (-DOPENVASSD_CONF="${OPENVASSD_CONF}")
-endif (OPENVASSD_CONF)
+if (OPENVAS_CONF)
+  add_definitions (-DOPENVAS_CONF="${OPENVAS_CONF}")
+endif (OPENVAS_CONF)
 
 if (OPENVAS_STATE_DIR)
   add_definitions (-DOPENVAS_STATE_DIR="${OPENVAS_STATE_DIR}")
@@ -139,7 +141,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 endif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 
 
-target_link_libraries (openvassd openvas_nasl_shared ${LIBOPENVAS_NASL_LDFLAGS}
+target_link_libraries (openvas openvas_nasl_shared ${LIBOPENVAS_NASL_LDFLAGS}
                        ${LIBOPENVAS_MISC_LDFLAGS}
                        ${LIBGVM_BASE_LDFLAGS}
                        ${GLIB_LDFLAGS} ${GCRYPT_LDFLAGS}
@@ -148,7 +150,30 @@ target_link_libraries (openvassd openvas_nasl_shared ${LIBOPENVAS_NASL_LDFLAGS}
 
 ## Tests
 
-enable_testing ()
+add_executable (attack-test
+                EXCLUDE_FROM_ALL
+                attack_tests.c
+
+                hosts.c nasl_plugins.c openvas.c
+                pluginlaunch.c pluginload.c
+                pluginscheduler.c plugs_req.c
+                processes.c sighand.c utils.c)
+
+set_target_properties (attack-test PROPERTIES LINKER_LANGUAGE C)
+
+add_test (attack-test attack-test)
+
+target_link_libraries (attack-test openvas_nasl_shared cgreen
+                       ${LIBOPENVAS_NASL_LDFLAGS}
+                       ${LIBOPENVAS_MISC_LDFLAGS}
+                       ${LIBGVM_BASE_LDFLAGS}
+                       ${GLIB_LDFLAGS} ${GCRYPT_LDFLAGS}
+                       ${EXECINFO_LDFLAGS}
+                       ${LINKER_HARDENING_FLAGS}
+                       -Wl,--wrap=redis_push_str)
+
+add_custom_target (tests
+                   DEPENDS attack-test)
 
 ## Static analysis
 
@@ -160,8 +185,8 @@ add_dependencies (check cppcheck)
 
 ## Tag files
 
-set (C_FILES "attack.c" "comm.c" "hosts.c"
-     "nasl_plugins.c" "ntp.c" "openvassd.c" "otp.c"
+set (C_FILES "attack.c" "hosts.c"
+     "nasl_plugins.c" "openvas.c"
      "pluginlaunch.c" "pluginload.c"
      "pluginscheduler.c" "plugs_req.c"
      "processes.c" "sighand.c" "utils.c")
@@ -174,33 +199,25 @@ add_dependencies (tags etags ctags)
 
 ## Install
 
-install (TARGETS openvassd
+install (TARGETS openvas
          RUNTIME DESTINATION ${SBINDIR}
          PERMISSIONS OWNER_EXECUTE OWNER_READ OWNER_WRITE
          GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
-install (FILES ${CMAKE_BINARY_DIR}/src/openvassd_log.conf
+install (FILES ${CMAKE_BINARY_DIR}/src/openvas_log.conf
          DESTINATION ${OPENVAS_SYSCONF_DIR})
 
 install (FILES ${CMAKE_BINARY_DIR}/tools/greenbone-nvt-sync
-         DESTINATION ${SBINDIR}
+         DESTINATION ${BINDIR}
          PERMISSIONS OWNER_EXECUTE OWNER_READ OWNER_WRITE
                      GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
-install (FILES ${CMAKE_BINARY_DIR}/doc/openvassd.8
+install (FILES ${CMAKE_BINARY_DIR}/doc/openvas.8
          DESTINATION ${DATADIR}/man/man8 )
 
 
 install (FILES ${CMAKE_SOURCE_DIR}/doc/greenbone-nvt-sync.8
          DESTINATION ${DATADIR}/man/man8 )
-
-install (FILES ${CMAKE_BINARY_DIR}/doc/redis_config_examples/redis_2_4.conf
-               ${CMAKE_BINARY_DIR}/doc/redis_config_examples/redis_2_6.conf
-               ${CMAKE_BINARY_DIR}/doc/redis_config_examples/redis_2_8.conf
-               ${CMAKE_BINARY_DIR}/doc/redis_config_examples/redis_3_0.conf
-               ${CMAKE_BINARY_DIR}/doc/redis_config_examples/redis_3_2.conf
-               ${CMAKE_BINARY_DIR}/doc/redis_config_examples/redis_4_0.conf
-         DESTINATION ${DATADIR}/doc/openvas-scanner/redis_config_examples/ )
 
 install (DIRECTORY DESTINATION ${OPENVAS_NVT_DIR})
 

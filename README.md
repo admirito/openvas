@@ -1,17 +1,24 @@
 ![Greenbone Logo](https://www.greenbone.net/wp-content/uploads/gb_logo_resilience_horizontal.png)
 
-# OpenVAS Scanner
+# OpenVAS
 
-[![GitHub releases](https://img.shields.io/github/release/greenbone/openvas-scanner.svg)](https://github.com/greenbone/openvas-scanner/releases)
-[![Code Documentation Coverage](https://img.shields.io/codecov/c/github/greenbone/openvas-scanner.svg?label=Doc%20Coverage&logo=codecov)](https://codecov.io/gh/greenbone/openvas-scanner)
-[![CircleCI](https://circleci.com/gh/greenbone/openvas-scanner/tree/openvas-scanner-6.0.svg?style=svg)](https://circleci.com/gh/greenbone/openvas-scanner/tree/openvas-scanner-6.0)
+[![GitHub releases](https://img.shields.io/github/release/greenbone/openvas.svg)](https://github.com/greenbone/openvas/releases)
+[![Code Documentation Coverage](https://img.shields.io/codecov/c/github/greenbone/openvas/openvas-7.0.svg?label=Doc%20Coverage&logo=codecov)](https://codecov.io/gh/greenbone/openvas)
+[![CircleCI](https://circleci.com/gh/greenbone/openvas/tree/openvas-7.0.svg?style=svg)](https://circleci.com/gh/greenbone/openvas/tree/openvas-7.0)
 
-This is the Open Vulnerability Assessment System (OpenVAS) Scanner of the
+This is the Open Vulnerability Assessment Scanner (OpenVAS) of the
 Greenbone Vulnerability Management (GVM) Solution.
 
 It is used for the Greenbone Security Manager appliances and is a full-featured
 scan engine that executes a continuously updated and extended feed of Network
 Vulnerability Tests (NVTs).
+
+## Releases
+￼
+All [release files](https://github.com/greenbone/openvas/releases) are signed with
+the [Greenbone Community Feed integrity key](https://community.greenbone.net/t/gcf-managing-the-digital-signatures/101).
+This gpg key can be downloaded at https://www.greenbone.net/GBCommunitySigningKey.asc
+and the fingerprint is `8AE4 BE42 9B60 A59B 311C  2E73 9823 FAA6 0ED1 E580`.
 
 ## Installation
 
@@ -22,7 +29,7 @@ This module can be configured, built and installed with following commands:
 
 For detailed installation requirements and instructions, please see the file
 [INSTALL.md](INSTALL.md). The file also contains instructions for setting up
-`openvas-scanner` and for making the scanner available to other GVM modules.
+`openvas` and for making the scanner available to other GVM modules.
 
 If you are not familiar or comfortable building from source code, we recommend
 that you use the Greenbone Community Edition, a prepared virtual machine with a
@@ -31,7 +38,7 @@ at <https://www.greenbone.net/en/community-edition/>.
 
 ## Support
 
-For any question on the usage of `openvas-scanner` please use the [Greenbone
+For any question on the usage of `openvas` please use the [Greenbone
 Community Portal](https://community.greenbone.net/c/gse). If you found a problem
 with the software, please [create an
 issue](https://github.com/greenbone/openvas-scanner/issues) on GitHub. If you
@@ -45,9 +52,9 @@ This project is maintained by [Greenbone Networks GmbH](https://www.greenbone.ne
 ## Contributing
 
 Your contributions are highly appreciated. Please [create a pull
-request](https://github.com/greenbone/openvas-scanner/pulls) on GitHub. Bigger
+request](https://github.com/greenbone/openvas/pulls) on GitHub. Bigger
 changes need to be discussed with the development team via the [issues section
-at GitHub](https://github.com/greenbone/openvas-scanner/issues) first.
+at GitHub](https://github.com/greenbone/openvas/issues) first.
 
 ## License
 

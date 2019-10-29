@@ -146,7 +146,7 @@ gcrypt_init ()
 }
 
 /**
- * @brief Main of the standalone nasl interpretor.
+ * @brief Main of the standalone nasl interpreter.
  * @return The number of times a NVT was launched
  *         (should be (number of targets) * (number of NVTS provided)).
  */
@@ -160,6 +160,7 @@ main (int argc, char **argv)
   gchar *default_target = "127.0.0.1";
   int mode = 0, err = 0;
   extern int global_nasl_debug;
+  GSList *unresolved;
 
   static gboolean display_version = FALSE;
   static gboolean nasl_debug = FALSE;
@@ -170,7 +171,6 @@ main (int argc, char **argv)
   static gchar *trace_file = NULL;
   static gchar *config_file = NULL;
   static gchar *source_iface = NULL;
-  static gchar *vendor_version_string = NULL;
   static gboolean with_safe_checks = FALSE;
   static gboolean signing_mode = FALSE;
   static gchar *include_dir = NULL;
@@ -200,8 +200,6 @@ main (int argc, char **argv)
      "Configuration file", "<filename>"},
     {"source-iface", 'e', 0, G_OPTION_ARG_STRING, &source_iface,
      "Source network interface for established connections.", "<iface_name>"},
-    {"vendor-version", '\0', 0, G_OPTION_ARG_STRING, &vendor_version_string,
-     "Use <string> as vendor version.", "<string>"},
     {"safe", 's', 0, G_OPTION_ARG_NONE, &with_safe_checks,
      "Specifies that the script should be run with 'safe checks' enabled",
      NULL},
@@ -283,9 +281,6 @@ main (int argc, char **argv)
       exit (1);
     }
 
-  if (vendor_version_string)
-    vendor_version_set (vendor_version_string);
-
   if (!(mode & (NASL_EXEC_PARSE_ONLY | NASL_LINT)) && geteuid ())
     {
       fprintf (stderr, "** WARNING : packet forgery will not work\n");
@@ -316,7 +311,13 @@ main (int argc, char **argv)
       fprintf (stderr, "Erroneous target %s\n", target);
       exit (1);
     }
-  gvm_hosts_resolve (hosts);
+  unresolved = gvm_hosts_resolve (hosts);
+  while (unresolved)
+    {
+      g_warning ("Couldn't resolve hostname '%s'", (char *) unresolved->data);
+      unresolved = unresolved->next;
+    }
+  g_slist_free_full (unresolved, g_free);
   g_free (target);
 
   // for absolute and relative paths
@@ -326,7 +327,11 @@ main (int argc, char **argv)
       add_nasl_inc_dir (include_dir);
     }
 
-  prefs_config (config_file ?: OPENVASSD_CONF);
+  prefs_config (config_file ?: OPENVAS_CONF);
+
+  if (prefs_get ("vendor_version") != NULL)
+    vendor_version_set (prefs_get ("vendor_version"));
+
   while ((host = gvm_hosts_next (hosts)))
     {
       struct in6_addr ip6;

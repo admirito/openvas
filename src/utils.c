@@ -23,24 +23,17 @@
  * @brief A bunch of miscellaneous functions, mostly file conversions.
  */
 
-#include "utils.h"
-
-#include "../misc/network.h" /* for stream_zero */
-#include "comm.h"
-#include "ntp.h"
-#include "pluginscheduler.h"
+#include "../misc/scanneraux.h" /* for struct scan_globals */
 
 #include <errno.h>          /* for errno() */
 #include <gvm/base/prefs.h> /* for prefs_get() */
 #include <stdlib.h>         /* for atoi() */
-#include <string.h>         /* for strchr() */
+#include <string.h>         /* for strcmp() */
 #include <sys/ioctl.h>      /* for ioctl() */
-#include <sys/stat.h>       /* for stat() */
 #include <sys/wait.h>       /* for waitpid() */
 
 extern int global_max_hosts;
 extern int global_max_checks;
-int global_scan_type = 1;
 
 #undef G_LOG_DOMAIN
 /**
@@ -49,22 +42,98 @@ int global_scan_type = 1;
 #define G_LOG_DOMAIN "sd   main"
 
 /**
- * @brief Check the scan type
- * @return 1 if OTP type, 0 if OSP.
+ * @brief Adds a 'translation' entry for a file sent by the client.
+ *
+ * Files sent by the client are stored in memory on the server side.
+ * In order to access these files, their original name ('local' to the client)
+ * can be 'translated' into the file contents of the in-memory copy of the
+ * file on the server side.
+ *
+ * @param globals    Global struct.
+ * @param file_hash  hash to reference the file.
+ * @param contents   Contents of the file.
  */
-int
-is_otp_scan ()
+static void
+files_add_translation (struct scan_globals *globals, const char *file_hash,
+                       char *contents)
 {
-  return global_scan_type;
+  GHashTable *trans = globals->files_translation;
+  // Register the mapping table if none there yet
+  if (trans == NULL)
+    {
+      trans = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+      globals->files_translation = trans;
+    }
+
+  g_hash_table_insert (trans, g_strdup (file_hash), contents);
 }
 
 /**
- * @brief Set the scan type
+ * @brief Adds a 'content size' entry for a file sent by the client.
+ *
+ * Files sent by the client are stored in memory on the server side.
+ * Because they may be binary we need to store the size of the uploaded file as
+ * well. This function sets up a mapping from the original name sent by the
+ * client to the file size.
+ *
+ * @param globals    Global struct.
+ * @param file_hash  hash to reference the file.
+ * @param filesize   Size of the file in bytes.
  */
-void
-set_scan_type (int type)
+static void
+files_add_size_translation (struct scan_globals *globals, const char *file_hash,
+                            const long filesize)
 {
-  global_scan_type = type;
+  GHashTable *trans = globals->files_size_translation;
+  gchar *filesize_str = g_strdup_printf ("%ld", filesize);
+
+  // Register the mapping table if none there yet
+  if (trans == NULL)
+    {
+      trans = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
+      globals->files_size_translation = trans;
+    }
+
+  g_hash_table_insert (trans, g_strdup (file_hash), g_strdup (filesize_str));
+}
+
+/**
+ * @brief Stores a file type preference in a hash table.
+ *
+ * @param globals    Global struct.
+ * @param file       File content.
+ * @param file_hash  hash to reference the file.
+ *
+ * @return 0 if successful, -1 in case of errors.
+ */
+int
+store_file (struct scan_globals *globals, const char *file,
+            const char *file_hash)
+{
+  char *origname;
+  gchar *contents = NULL;
+
+  size_t bytes = 0;
+
+  if (!file_hash && *file_hash == '\0')
+    return -1;
+
+  origname = g_strdup (file_hash);
+
+  contents = (gchar *) g_base64_decode (file, &bytes);
+
+  if (contents == NULL)
+    {
+      g_debug ("store_file: Failed to allocate memory for uploaded file.");
+      g_free (origname);
+      return -1;
+    }
+
+  files_add_translation (globals, origname, contents);
+  files_add_size_translation (globals, origname, bytes);
+
+  g_free (origname);
+  return 0;
 }
 
 /**
@@ -86,7 +155,7 @@ get_max_hosts_number (void)
       else if (max_hosts > global_max_hosts)
         {
           g_debug ("Client tried to raise the maximum hosts number - %d."
-                   " Using %d. Change 'max_hosts' in openvassd.conf if you"
+                   " Using %d. Change 'max_hosts' in openvas.conf if you"
                    " believe this is incorrect",
                    max_hosts, global_max_hosts);
           max_hosts = global_max_hosts;
@@ -117,7 +186,7 @@ get_max_checks_number (void)
       else if (max_checks > global_max_checks)
         {
           g_debug ("Client tried to raise the maximum checks number - %d."
-                   " Using %d. Change 'max_checks' in openvassd.conf if you"
+                   " Using %d. Change 'max_checks' in openvas.conf if you"
                    " believe this is incorrect",
                    max_checks, global_max_checks);
           max_checks = global_max_checks;
@@ -182,59 +251,12 @@ is_scanner_only_pref (const char *pref)
            "kb_location") // old name of db_address, ignore from old conf's
       || !strcmp (pref, "db_address") || !strcmp (pref, "negot_timeout")
       || !strcmp (pref, "force_pubkey_auth")
-      || !strcmp (pref, "log_whole_attack") || !strcmp (pref, "be_nice")
+      || !strcmp (pref, "log_whole_attack")
       || !strcmp (pref, "log_plugins_name_at_load")
       || !strcmp (pref, "nasl_no_signature_check")
+      || !strcmp (pref, "vendor_version")
       /* Preferences starting with sys_ are scanner-side only. */
       || !strncmp (pref, "sys_", 4))
     return 1;
   return 0;
-}
-
-/**
- * @brief Writes data to a socket.
- */
-static void
-auth_send (int soc, char *data)
-{
-  unsigned int sent = 0;
-  gsize length;
-
-  if (soc < 0)
-    return;
-
-  /* Convert to UTF-8 before sending to Manager. */
-  data = g_convert (data, -1, "UTF-8", "ISO_8859-1", NULL, &length, NULL);
-  while (sent < length)
-    {
-      int n = nsend (soc, data + sent, length - sent, 0);
-      if (n < 0)
-        {
-          if ((errno != ENOMEM) && (errno != ENOBUFS))
-            {
-              g_free (data);
-              return;
-            }
-        }
-      else
-        sent += n;
-    }
-  g_free (data);
-}
-
-/**
- * @brief Writes data to a socket.
- */
-void
-send_printf (int soc, char *data, ...)
-{
-  va_list param;
-  char *buffer;
-
-  va_start (param, data);
-  buffer = g_strdup_vprintf (data, param);
-  va_end (param);
-
-  auth_send (soc, buffer);
-  g_free (buffer);
 }

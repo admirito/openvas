@@ -175,22 +175,14 @@ nasl_thread (struct script_infos *args)
   kb_t kb;
   GError *error = NULL;
 
+  /* Make plugin process a group leader, to make it easier to cleanup forked
+   * processes & their children. */
+  setpgid (0, 0);
   nvticache_reset ();
-  if (prefs_get_bool ("be_nice"))
-    {
-      int nice_retval;
-      errno = 0;
-      nice_retval = nice (-5);
-      if (nice_retval == -1 && errno != 0)
-        {
-          g_debug ("Unable to renice process: %d", errno);
-        }
-    }
-
   kb = args->key;
   kb_lnk_reset (kb);
   addr6_to_str (args->ip, ip_str);
-  proctitle_set ("openvassd: testing %s (%s)", ip_str, args->name);
+  proctitle_set ("openvas: testing %s (%s)", ip_str, args->name);
 
   if (prefs_get_bool ("nasl_no_signature_check"))
     nasl_mode |= NASL_ALWAYS_SIGNED;

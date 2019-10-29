@@ -25,28 +25,18 @@
 
 #include "plugutils.h"
 
-#include "network.h"
+#include "network.h" // for OPENVAS_ENCAPS_IP
 
-#include <ctype.h>
-#include <errno.h>
-#include <glib.h>
-#include <gvm/base/hosts.h>
-#include <gvm/base/logging.h>
-#include <gvm/base/networking.h>
-#include <gvm/base/prefs.h> /* for prefs_get_bool */
-#include <gvm/util/kb.h>
-#include <gvm/util/nvticache.h> /* for nvticache_get_by_oid() */
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <time.h>
-#include <unistd.h>
+#include <errno.h>               // for errno
+#include <gvm/base/hosts.h>      // for g_vhost_t
+#include <gvm/base/networking.h> // for port_protocol_t
+#include <gvm/base/prefs.h>      // for prefs_get_bool
+#include <gvm/util/nvticache.h>  // for nvticache_initialized
+#include <stdio.h>               // for snprintf
+#include <stdlib.h>              // for exit
+#include <string.h>              // for strcmp
+#include <sys/wait.h>            // for wait
+#include <unistd.h>              // for fork
 
 #undef G_LOG_DOMAIN
 /**
@@ -70,36 +60,6 @@ plug_current_vhost (void)
 }
 
 static int plug_fork_child (kb_t);
-
-void
-plug_set_xref (struct script_infos *args, char *name, char *value)
-{
-  nvti_t *n = args->nvti;
-  char *new;
-
-  if (nvti_xref (n))
-    new = g_strconcat (nvti_xref (n), ", ", name, ":", value, NULL);
-  else
-    new = g_strconcat (name, ":", value, NULL);
-
-  nvti_set_xref (n, new);
-  g_free (new);
-}
-
-void
-plug_set_tag (struct script_infos *args, char *name, char *value)
-{
-  nvti_t *n = args->nvti;
-  char *new;
-
-  if (nvti_tag (n))
-    new = g_strconcat (nvti_tag (n), "|", name, "=", value, NULL);
-  else
-    new = g_strconcat (name, "=", value, NULL);
-
-  nvti_set_tag (n, new);
-  g_free (new);
-}
 
 void
 plug_set_dep (struct script_infos *args, const char *depname)
@@ -337,8 +297,7 @@ plug_get_host_ip_str (struct script_infos *desc)
  * @brief Post a security message (e.g. LOG, NOTE, WARNING ...).
  *
  * @param oid   The oid of the NVT
- * @param desc  The script infos where to get the nvtichache from and some
- *              other settings and it is used to send the messages
+ * @param desc  The script infos where to get settings.
  * @param port  Port number related to the issue.
  * @param proto Protocol related to the issue (tcp or udp).
  * @param action The actual result text
@@ -348,15 +307,15 @@ void
 proto_post_wrapped (const char *oid, struct script_infos *desc, int port,
                     const char *proto, const char *action, const char *what)
 {
-  const char *prepend_tags, *append_tags, *hostname = "";
-  char *buffer, *data, **nvti_tags = NULL, port_s[16] = "general";
+  const char *hostname = "";
+  char *buffer, *data, port_s[16] = "general";
   char ip_str[INET6_ADDRSTRLEN];
   GString *action_str;
   gsize length;
   kb_t kb;
 
   /* Should not happen, just to avoid trouble stop here if no NVTI found */
-  if (!nvticache_initialized () || !oid)
+  if (!oid)
     return;
 
   if (action == NULL)
@@ -365,94 +324,6 @@ proto_post_wrapped (const char *oid, struct script_infos *desc, int port,
     {
       action_str = g_string_new (action);
       g_string_append (action_str, "\n");
-    }
-
-  prepend_tags = prefs_get ("result_prepend_tags");
-  append_tags = prefs_get ("result_append_tags");
-
-  if (prepend_tags || append_tags)
-    {
-      char *tags = nvticache_get_tags (oid);
-      nvti_tags = g_strsplit (tags, "|", 0);
-      g_free (tags);
-    }
-
-  /* This is convenience functionality in preparation for the breaking up of the
-   * NVT description block and adding proper handling of refined meta
-   * information all over the OpenVAS Framework.
-   */
-  if (nvti_tags != NULL)
-    {
-      if (prepend_tags != NULL)
-        {
-          gchar **tags = g_strsplit (prepend_tags, ",", 0);
-          int i = 0;
-          gchar *tag_prefix;
-          gchar *tag_value;
-          while (tags[i] != NULL)
-            {
-              int j = 0;
-              tag_value = NULL;
-              tag_prefix = g_strconcat (tags[i], "=", NULL);
-              while (nvti_tags[j] != NULL && tag_value == NULL)
-                {
-                  if (g_str_has_prefix (nvti_tags[j], tag_prefix))
-                    {
-                      tag_value = g_strstr_len (nvti_tags[j], -1, "=");
-                    }
-                  j++;
-                }
-              g_free (tag_prefix);
-
-              if (tag_value != NULL)
-                {
-                  tag_value = tag_value + 1;
-                  gchar *tag_line =
-                    g_strdup_printf ("%s:\n%s\n\n", tags[i], tag_value);
-                  g_string_prepend (action_str, tag_line);
-
-                  g_free (tag_line);
-                }
-              i++;
-            }
-          g_strfreev (tags);
-        }
-
-      if (append_tags != NULL)
-        {
-          gchar **tags = g_strsplit (append_tags, ",", 0);
-          int i = 0;
-          gchar *tag_prefix;
-          gchar *tag_value;
-
-          while (tags[i] != NULL)
-            {
-              int j = 0;
-              tag_value = NULL;
-              tag_prefix = g_strconcat (tags[i], "=", NULL);
-              while (nvti_tags[j] != NULL && tag_value == NULL)
-                {
-                  if (g_str_has_prefix (nvti_tags[j], tag_prefix))
-                    {
-                      tag_value = g_strstr_len (nvti_tags[j], -1, "=");
-                    }
-                  j++;
-                }
-              g_free (tag_prefix);
-
-              if (tag_value != NULL)
-                {
-                  tag_value = tag_value + 1;
-                  gchar *tag_line =
-                    g_strdup_printf ("%s:\n%s\n\n", tags[i], tag_value);
-                  g_string_append (action_str, tag_line);
-
-                  g_free (tag_line);
-                }
-              i++;
-            }
-          g_strfreev (tags);
-        }
     }
 
   if (port > 0)
@@ -521,60 +392,34 @@ post_error (const char *oid, struct script_infos *desc, int port,
   proto_post_error (oid, desc, port, "tcp", action);
 }
 
-void
-add_plugin_preference (struct script_infos *desc, const char *name,
-                       const char *type, const char *defaul)
-{
-  nvti_t *n = desc->nvti;
-  nvtpref_t *np =
-    nvtpref_new ((gchar *) name, (gchar *) type, (gchar *) defaul);
-
-  nvti_add_pref (n, np);
-}
-
 char *
 get_plugin_preference (const char *oid, const char *name)
 {
   GHashTable *prefs;
   GHashTableIter iter;
-  char *plug_name, *cname, *retval = NULL;
+  char *cname, *retval = NULL;
   void *itername, *itervalue;
+  char prefix[1024], suffix[1024];
 
   prefs = preferences_get ();
   if (!prefs || !nvticache_initialized () || !oid || !name)
     return NULL;
 
-  plug_name = nvticache_get_name (oid);
-  if (!plug_name)
-    return NULL;
   cname = g_strdup (name);
-
   g_strchomp (cname);
   g_hash_table_iter_init (&iter, prefs);
+  snprintf (prefix, sizeof (prefix), "%s:", oid);
+  snprintf (suffix, sizeof (suffix), ":%s", cname);
+  /* NVT preferences receiveed in OID:PrefID:PrefType:PrefName form */
   while (g_hash_table_iter_next (&iter, &itername, &itervalue))
     {
-      char *a, *b;
-
-      a = strchr (itername, '[');
-      b = strchr (itername, ']');
-      if (a && b && b[1] == ':')
+      if (g_str_has_prefix (itername, prefix)
+          && g_str_has_suffix (itername, suffix))
         {
-          b += 2 * sizeof (char);
-          if (!strcmp (cname, b))
-            {
-              int old = a[0];
-              a[0] = 0;
-              if (!strcmp (itername, plug_name))
-                {
-                  a[0] = old;
-                  retval = g_strdup (itervalue);
-                  break;
-                }
-              a[0] = old;
-            }
+          retval = g_strdup (itervalue);
+          break;
         }
     }
-  g_free (plug_name);
   /* If no value set by the user, get the default one. */
   if (!retval)
     {
@@ -625,7 +470,7 @@ get_plugin_preference_fname (struct script_infos *desc, const char *filename)
     return NULL;
 
   tmpfile =
-    g_file_open_tmp ("openvassd-file-upload.XXXXXX", &tmpfilename, &error);
+    g_file_open_tmp ("openvas-file-upload.XXXXXX", &tmpfilename, &error);
   if (tmpfile == -1)
     {
       g_message ("get_plugin_preference_fname: Could not open temporary"
@@ -819,9 +664,7 @@ static int
 plug_fork_child (kb_t kb)
 {
   pid_t pid;
-  char key[128];
 
-  snprintf (key, sizeof (key), "internal/child/%d", getpid ());
   if ((pid = fork ()) == 0)
     {
       sig_term (_exit);
@@ -836,14 +679,22 @@ plug_fork_child (kb_t kb)
       return -1;
     }
   else
-    {
-      kb_item_set_int (kb, key, pid);
-      waitpid (pid, NULL, 0);
-      kb_del_items (kb, key);
-    }
+    waitpid (pid, NULL, 0);
   return 1;
 }
 
+/**
+ * @brief Get values from a kb under the given key name.
+ *
+ * @param[in]     args   The script infos where to get the kb from.
+ * @param[in]     name   Key name to search in the kb.
+ * @param[in/out] type   If 1 is given, the answer is forced to be KB_TYPE_INT
+ *                       type. Otherwise it returns the fetched type.
+ * @param[in]     len    Desired string length to be returned.
+ * @param[in]     single In case of a list, fetch only the last element
+ *
+ * @return Null if no result, or a void pointer to the result in success.
+ */
 void *
 plug_get_key (struct script_infos *args, char *name, int *type, size_t *len,
               int single)
@@ -851,14 +702,16 @@ plug_get_key (struct script_infos *args, char *name, int *type, size_t *len,
   kb_t kb = args->key;
   struct kb_item *res = NULL, *res_list;
 
-  if (type != NULL)
+  if (type != NULL && *type != KB_TYPE_INT)
     *type = -1;
 
   if (kb == NULL)
     return NULL;
 
-  if (single)
+  if (single && *type != KB_TYPE_INT)
     res = kb_item_get_single (kb, name, KB_TYPE_UNSPEC);
+  else if (*type == KB_TYPE_INT)
+    res = kb_item_get_single (kb, name, KB_TYPE_INT);
   else
     res = kb_item_get_all (kb, name);
 
