@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.0.1] (2020-05-12)
+
+### Added
+- Display gvm-libs version in `openvas --version` output [#436](https://github.com/greenbone/openvas/pull/436)
+- Create greenbone-nvt-sync create lock file during feed sync.
+  [#457](https://github.com/greenbone/openvas/pull/457)
+  [#460](https://github.com/greenbone/openvas/pull/460)
+- Extend script_get_preference() to get the value by id. [#471](https://github.com/greenbone/openvas/pull/471)
+
+### Changed
+- Improve handling of invalid or existent ids of nvt's preference id. [#416](https://github.com/greenbone/openvas/pull/416)
+- Perform a scan even if there are missing plugins. [#439](https://github.com/greenbone/openvas/pull/439)
+- Don't reload the plugins when start a new scan. [#457](https://github.com/greenbone/openvas/pull/457)
+- Use new URL for GCF rsync. [#474](https://github.com/greenbone/openvas/pull/474)
+
+### Fixed
+- Do not store in memory an empty file received as nvt preference. [#409](https://github.com/greenbone/openvas/pull/409)
+- Fix stop scan. [#414](https://github.com/greenbone/openvas/pull/414)
+- Fix hanging scans. [#423](https://github.com/greenbone/openvas/pull/423)
+- Improve signal handling when update vhosts list. [#426](https://github.com/greenbone/openvas/pull/426)
+- Wait for all children instead of waiting just for one a time. [#429](https://github.com/greenbone/openvas/pull/429)
+- Fix format-truncation warning in GCC 8.2 and later. [#462](https://github.com/greenbone/openvas/pull/462)
+
+### Removed
+- Drop HTTP sync [#489](https://github.com/greenbone/openvas/pull/489)
+
+[7.0.1]: https://github.com/greenbone/openvas/compare/v7.0.1...v7.0.0
+
 ## [7.0.0] (2019-10-11)
 
 ### Added

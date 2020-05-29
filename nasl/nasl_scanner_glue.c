@@ -458,8 +458,15 @@ script_add_preference (lex_ctxt *lexic)
 
   if (!script_infos->nvti)
     return FAKE_CELL;
-  if (id <= 0)
+  if (id < 0)
     id = nvti_pref_len (script_infos->nvti) + 1;
+  if (id == 0)
+    {
+      nasl_perror (lexic,
+                   "Invalid id or not allowed id value in the call to %s()\n",
+                   __func__);
+      return FAKE_CELL;
+    }
   if (!name || !type || !value)
     {
       nasl_perror (lexic,
@@ -473,6 +480,11 @@ script_add_preference (lex_ctxt *lexic)
           nasl_perror (lexic, "Preference '%s' already exists\n", name);
           return FAKE_CELL;
         }
+      if (id == nvtpref_id (nvti_pref (script_infos->nvti, i)))
+        {
+          nasl_perror (lexic, "Invalid or already existent preference id\n");
+          return FAKE_CELL;
+        }
     }
 
   np = nvtpref_new (id, name, type, value);
@@ -480,23 +492,35 @@ script_add_preference (lex_ctxt *lexic)
   return FAKE_CELL;
 }
 
+/**
+ * @brief Get a preferences of the current script.
+ *
+ * Search the preference by preference name or by preferences id.
+ *
+ * @param[in] lexic     NASL lexer.
+ *
+ * @return lex cell containing the preferences value as a string.
+ *         Fake cell otherwise
+ */
 tree_cell *
 script_get_preference (lex_ctxt *lexic)
 {
   tree_cell *retc;
+  int id = get_int_var_by_name (lexic, "id", -1);
   char *pref = get_str_var_by_num (lexic, 0);
   char *value;
 
-  if (pref == NULL)
+  if (pref == NULL && id == -1)
     {
       nasl_perror (lexic,
                    "Argument error in the function script_get_preference()\n");
-      nasl_perror (
-        lexic, "Function usage is : pref = script_get_preference(<name>)\n");
+      nasl_perror (lexic,
+                   "Function usage is : pref = script_get_preference(<name>, "
+                   "id:<id>)\n");
       return FAKE_CELL;
     }
 
-  value = get_plugin_preference (lexic->oid, pref);
+  value = get_plugin_preference (lexic->oid, pref, id);
   if (value != NULL)
     {
       retc = alloc_typed_cell (CONST_INT);
@@ -534,7 +558,7 @@ script_get_preference_file_content (lex_ctxt *lexic)
       return NULL;
     }
 
-  value = get_plugin_preference (lexic->oid, pref);
+  value = get_plugin_preference (lexic->oid, pref, -1);
   if (value == NULL)
     return NULL;
 
@@ -575,7 +599,7 @@ script_get_preference_file_location (lex_ctxt *lexic)
       return NULL;
     }
 
-  value = get_plugin_preference (lexic->oid, pref);
+  value = get_plugin_preference (lexic->oid, pref, -1);
   if (value == NULL)
     {
       nasl_perror (

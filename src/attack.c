@@ -229,14 +229,6 @@ scan_is_stopped ()
   return global_scan_stop;
 }
 
-int global_stop_all_scans = 0;
-
-static int
-all_scans_are_stopped ()
-{
-  return global_stop_all_scans;
-}
-
 /**
  * @brief Checks that an NVT category is safe.
  *
@@ -252,6 +244,72 @@ nvti_category_is_safe (int category)
       || category == ACT_FLOOD || category == ACT_DENIAL)
     return 0;
   return 1;
+}
+
+static kb_t host_kb = NULL;
+static GSList *host_vhosts = NULL;
+static int check_new_vhosts_flag = 0;
+
+/**
+ * @brief Return check_new_vhosts_flag. After reading must be clean with
+ *        unset_check_new_vhosts_flag(), to avoid fetching unnecessarily.
+ * @return 1 means new vhosts must be fetched. 0 nothing to do.
+ */
+static int
+get_check_new_vhosts_flag ()
+{
+  return check_new_vhosts_flag;
+}
+
+/**
+ * @brief Set global check_new_vhosts_flag to indicate that new vhosts must be
+ *        fetched.
+ */
+static void
+set_check_new_vhosts_flag ()
+{
+  check_new_vhosts_flag = 1;
+}
+
+/**
+ * @brief Unset global check_new_vhosts_flag. Must be called once the
+ *        vhosts have been fetched.
+ */
+static void
+unset_check_new_vhosts_flag ()
+{
+  check_new_vhosts_flag = 0;
+}
+
+/**
+ * @brief Check if a plugin process pushed a new vhost value.
+ *
+ * @param kb        Host scan KB.
+ * @param vhosts    List of vhosts to add new vhosts to.
+ *
+ * @return New vhosts list.
+ */
+static void
+check_new_vhosts ()
+{
+  char *value;
+
+  if (get_check_new_vhosts_flag () == 0)
+    return;
+
+  while ((value = kb_item_pop_str (host_kb, "internal/vhosts")))
+    {
+      /* Get the source. */
+      char buffer[4096], *source;
+      gvm_vhost_t *vhost;
+
+      g_snprintf (buffer, sizeof (buffer), "internal/source/%s", value);
+      source = kb_item_pop_str (host_kb, buffer);
+      assert (source);
+      vhost = gvm_vhost_new (value, source);
+      host_vhosts = g_slist_append (host_vhosts, vhost);
+    }
+  unset_check_new_vhosts_flag ();
 }
 
 /**
@@ -283,7 +341,7 @@ launch_plugin (struct scan_globals *globals, struct scheduler_plugin *plugin,
       plugin->running_state = PLUGIN_STATUS_DONE;
       goto finish_launch_plugin;
     }
-  if (scan_is_stopped () || all_scans_are_stopped ())
+  if (scan_is_stopped ())
     {
       if (nvti_category (nvti) != ACT_END)
         {
@@ -364,7 +422,8 @@ launch_plugin (struct scan_globals *globals, struct scheduler_plugin *plugin,
       goto finish_launch_plugin;
     }
 
-  /* Start the plugin */
+  /* Update vhosts list and start the plugin */
+  check_new_vhosts ();
   pid = plugin_launch (globals, plugin, ip, vhosts, kb, nvti);
   if (pid < 0)
     {
@@ -460,36 +519,6 @@ init_host_kb (struct scan_globals *globals, char *ip_str, kb_t *network_kb)
   return kb;
 }
 
-static kb_t host_kb = NULL;
-static GSList *host_vhosts = NULL;
-
-/**
- * @brief Check if a plugin process pushed a new vhost value.
- *
- * @param kb        Host scan KB.
- * @param vhosts    List of vhosts to add new vhosts to.
- *
- * @return New vhosts list.
- */
-static void
-check_new_vhosts ()
-{
-  char *value;
-
-  while ((value = kb_item_pop_str (host_kb, "internal/vhosts")))
-    {
-      /* Get the source. */
-      char buffer[4096], *source;
-      gvm_vhost_t *vhost;
-
-      g_snprintf (buffer, sizeof (buffer), "internal/source/%s", value);
-      source = kb_item_pop_str (host_kb, buffer);
-      assert (source);
-      vhost = gvm_vhost_new (value, source);
-      host_vhosts = g_slist_append (host_vhosts, vhost);
-    }
-}
-
 /**
  * @brief Attack one host.
  */
@@ -502,7 +531,7 @@ attack_host (struct scan_globals *globals, struct in6_addr *ip, GSList *vhosts,
   char ip_str[INET6_ADDRSTRLEN];
 
   addr6_to_str (ip, ip_str);
-  openvas_signal (SIGUSR2, check_new_vhosts);
+  openvas_signal (SIGUSR2, set_check_new_vhosts_flag);
   host_kb = kb;
   host_vhosts = vhosts;
   kb_item_set_str (kb, "internal/ip", ip_str, 0);
@@ -583,8 +612,8 @@ attack_host (struct scan_globals *globals, struct in6_addr *ip, GSList *vhosts,
                 }
             }
 
-          if ((cur_plug * 100) / num_plugs >= last_status && !scan_is_stopped ()
-              && !all_scans_are_stopped ())
+          if ((cur_plug * 100) / num_plugs >= last_status
+              && !scan_is_stopped ())
             {
               last_status = (cur_plug * 100) / num_plugs + 2;
               if (comm_send_status (kb, ip_str, cur_plug, num_plugs) < 0)
@@ -601,7 +630,7 @@ attack_host (struct scan_globals *globals, struct in6_addr *ip, GSList *vhosts,
     }
 
   pluginlaunch_wait (kb);
-  if (!scan_is_stopped () && !all_scans_are_stopped ())
+  if (!scan_is_stopped ())
     comm_send_status (kb, ip_str, num_plugs, num_plugs);
 
 host_died:
@@ -751,13 +780,9 @@ attack_start (struct attack_start_args *args)
   g_free (hostnames);
   attack_host (globals, &hostip, args->host->vhosts, args->sched, kb, net_kb);
 
-  if (!scan_is_stopped () && !all_scans_are_stopped ())
+  if (!scan_is_stopped ())
     {
-      char key[1024];
       struct timeval now;
-
-      snprintf (key, sizeof (key), "internal/%s", globals->scan_id);
-      kb_item_set_str (kb, key, "finished", 0);
 
       gettimeofday (&now, NULL);
       if (now.tv_usec < then.tv_usec)
@@ -959,15 +984,21 @@ check_kb_access ()
 static void
 handle_scan_stop_signal ()
 {
-  pluginlaunch_stop ();
-  global_scan_stop = 1;
-}
+  int i = atoi (prefs_get ("ov_maindbid"));
+  kb_t main_kb = NULL;
+  char *pid;
 
-static void
-handle_stop_all_scans_signal ()
-{
-  global_stop_all_scans = 1;
-  hosts_stop_all ();
+  global_scan_stop = 1;
+  main_kb = kb_direct_conn (prefs_get ("db_address"), i);
+  pid = kb_item_get_str (main_kb, ("internal/ovas_pid"));
+  kb_lnk_reset (main_kb);
+
+  if (atoi (pid) == getpid ())
+    hosts_stop_all ();
+  else
+    pluginlaunch_stop ();
+
+  g_free (pid);
 }
 
 /**
@@ -1043,13 +1074,30 @@ attack_network (struct scan_globals *globals, kb_t *network_kb)
     }
 
   /* Initialize the attack. */
+  int plugins_init_error = 0;
   sched = plugins_scheduler_init (prefs_get ("plugin_set"),
                                   prefs_get_bool ("auto_enable_dependencies"),
-                                  network_phase);
+                                  network_phase, &plugins_init_error);
   if (!sched)
     {
       g_message ("Couldn't initialize the plugin scheduler");
       return;
+    }
+
+  if (plugins_init_error > 0)
+    {
+      char buf[96];
+      int i = atoi (prefs_get ("ov_maindbid"));
+      kb_t main_kb = NULL;
+
+      sprintf (buf,
+               "%d errors were found during the plugin scheduling. "
+               "Some plugins have not been launched.",
+               plugins_init_error);
+
+      main_kb = kb_direct_conn (prefs_get ("db_address"), i);
+      error_message_to_client2 (main_kb, buf, NULL);
+      kb_lnk_reset (main_kb);
     }
 
   max_hosts = get_max_hosts_number ();
@@ -1111,8 +1159,7 @@ attack_network (struct scan_globals *globals, kb_t *network_kb)
    * Start the attack !
    */
   openvas_signal (SIGUSR1, handle_scan_stop_signal);
-  openvas_signal (SIGUSR2, handle_stop_all_scans_signal);
-  while (host && !scan_is_stopped () && !all_scans_are_stopped ())
+  while (host && !scan_is_stopped ())
     {
       int pid, rc;
       struct attack_start_args args;
@@ -1142,7 +1189,7 @@ attack_network (struct scan_globals *globals, kb_t *network_kb)
           goto scan_stop;
         }
 
-      if (scan_is_stopped () || all_scans_are_stopped ())
+      if (scan_is_stopped ())
         {
           g_free (host_str);
           continue;
@@ -1193,7 +1240,6 @@ attack_network (struct scan_globals *globals, kb_t *network_kb)
   while (hosts_read () == 0)
     ;
   g_message ("Test complete");
-  set_scan_status ("finished");
 
 scan_stop:
   /* Free the memory used by the files uploaded by the user, if any. */
@@ -1202,10 +1248,6 @@ scan_stop:
     g_hash_table_destroy (files);
 
 stop:
-
-  if (all_scans_are_stopped ())
-    {
-    }
 
   gvm_hosts_free (hosts);
   g_free (globals->network_scan_status);
@@ -1217,7 +1259,8 @@ stop:
   g_message ("Total time to scan all hosts : %ld seconds",
              now.tv_sec - then.tv_sec);
 
-  if (do_network_scan && network_phase && !scan_is_stopped ()
-      && !all_scans_are_stopped ())
+  if (do_network_scan && network_phase && !scan_is_stopped ())
     attack_network (globals, network_kb);
+  else
+    set_scan_status ("finished");
 }

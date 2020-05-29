@@ -98,9 +98,9 @@ static int
 unscanned_ports_as_closed (port_protocol_t ptype)
 {
   if (ptype == PORT_PROTOCOL_UDP)
-    return (prefs_get_bool ("unscanned_closed_udp") ? 0 : 1);
+    return prefs_get_bool ("unscanned_closed_udp") ? 0 : 1;
 
-  return (prefs_get_bool ("unscanned_closed") ? 0 : 1);
+  return prefs_get_bool ("unscanned_closed") ? 0 : 1;
 }
 
 /**
@@ -153,13 +153,13 @@ host_get_port_state_proto (struct script_infos *args, int portnum, char *proto)
 int
 host_get_port_state (struct script_infos *plugdata, int portnum)
 {
-  return (host_get_port_state_proto (plugdata, portnum, "tcp"));
+  return host_get_port_state_proto (plugdata, portnum, "tcp");
 }
 
 int
 host_get_port_state_udp (struct script_infos *plugdata, int portnum)
 {
-  return (host_get_port_state_proto (plugdata, portnum, "udp"));
+  return host_get_port_state_proto (plugdata, portnum, "udp");
 }
 
 int
@@ -392,34 +392,63 @@ post_error (const char *oid, struct script_infos *desc, int port,
   proto_post_error (oid, desc, port, "tcp", action);
 }
 
+/**
+ * @brief Get the a plugins preference.
+ *
+ * Search in the preferences set by the client. If it is not
+ * present, search in redis cache for the default.
+ *
+ * @param[in] oid Script OID to get the preference from
+ * @param[in] name Name of the preference to get
+ * @param[in] pref_id Id of the preferences to get
+ *
+ * @return script preference on success, Null otherwise.
+ **/
 char *
-get_plugin_preference (const char *oid, const char *name)
+get_plugin_preference (const char *oid, const char *name, int pref_id)
 {
   GHashTable *prefs;
   GHashTableIter iter;
-  char *cname, *retval = NULL;
+  char *cname = NULL, *retval = NULL;
   void *itername, *itervalue;
   char prefix[1024], suffix[1024];
 
   prefs = preferences_get ();
-  if (!prefs || !nvticache_initialized () || !oid || !name)
+  if (!prefs || !nvticache_initialized () || !oid || (!name && pref_id < 1))
     return NULL;
 
-  cname = g_strdup (name);
-  g_strchomp (cname);
   g_hash_table_iter_init (&iter, prefs);
-  snprintf (prefix, sizeof (prefix), "%s:", oid);
-  snprintf (suffix, sizeof (suffix), ":%s", cname);
-  /* NVT preferences receiveed in OID:PrefID:PrefType:PrefName form */
-  while (g_hash_table_iter_next (&iter, &itername, &itervalue))
+
+  if (pref_id > 0)
     {
-      if (g_str_has_prefix (itername, prefix)
-          && g_str_has_suffix (itername, suffix))
+      snprintf (prefix, sizeof (prefix), "%s:%d:", oid, pref_id);
+      while (g_hash_table_iter_next (&iter, &itername, &itervalue))
         {
-          retval = g_strdup (itervalue);
-          break;
+          if (g_str_has_prefix (itername, prefix))
+            {
+              retval = g_strdup (itervalue);
+              break;
+            }
         }
     }
+  else
+    {
+      cname = g_strdup (name);
+      g_strchomp (cname);
+      snprintf (prefix, sizeof (prefix), "%s:", oid);
+      snprintf (suffix, sizeof (suffix), ":%s", cname);
+      /* NVT preferences received in OID:PrefID:PrefType:PrefName form */
+      while (g_hash_table_iter_next (&iter, &itername, &itervalue))
+        {
+          if (g_str_has_prefix (itername, prefix)
+              && g_str_has_suffix (itername, suffix))
+            {
+              retval = g_strdup (itervalue);
+              break;
+            }
+        }
+    }
+
   /* If no value set by the user, get the default one. */
   if (!retval)
     {
@@ -428,7 +457,8 @@ get_plugin_preference (const char *oid, const char *name)
       tmp = nprefs = nvticache_get_prefs (oid);
       while (tmp)
         {
-          if (!strcmp (cname, nvtpref_name (tmp->data)))
+          if ((cname && !strcmp (cname, nvtpref_name (tmp->data)))
+              || (pref_id >= 0 && pref_id == nvtpref_id (tmp->data)))
             {
               retval = g_strdup (nvtpref_default (tmp->data));
               break;
@@ -437,7 +467,8 @@ get_plugin_preference (const char *oid, const char *name)
         }
       g_slist_free_full (nprefs, (void (*) (void *)) nvtpref_free);
     }
-  g_free (cname);
+  if (cname)
+    g_free (cname);
   return retval;
 }
 

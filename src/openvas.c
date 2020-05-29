@@ -50,6 +50,7 @@
 #include <gvm/base/nvti.h>      /* for prefs_get() */
 #include <gvm/base/prefs.h>     /* for prefs_get() */
 #include <gvm/base/proctitle.h> /* for proctitle_set */
+#include <gvm/base/version.h>   /* for gvm_libs_version */
 #include <gvm/util/kb.h>        /* for KB_PATH_DEFAULT */
 #include <gvm/util/nvticache.h> /* nvticache_free */
 #include <gvm/util/uuidutils.h> /* gvm_uuid_make */
@@ -247,8 +248,8 @@ load_scan_preferences (struct scan_globals *globals)
       if (pref[0])
         {
           gchar **pref_name = g_strsplit (pref[0], ":", 3);
-          if (pref_name[1] && pref_name[2]
-              && !strncmp (pref_name[2], "file", 4))
+          if (pref_name[1] && pref_name[2] && !strncmp (pref_name[2], "file", 4)
+              && strcmp (pref[1], ""))
             {
               char *file_hash = gvm_uuid_make ();
               int ret;
@@ -367,7 +368,6 @@ void
 start_single_task_scan ()
 {
   struct scan_globals *globals;
-  int ret = 0;
 
 #if GNUTLS_VERSION_NUMBER < 0x030300
   if (openvas_SSL_init () < 0)
@@ -381,10 +381,11 @@ start_single_task_scan ()
   g_message ("openvas %s started", OPENVAS_VERSION);
 #endif
 
-  openvas_signal (SIGHUP, SIG_IGN);
-  ret = plugins_init ();
-  if (ret)
-    exit (0);
+  if (plugins_cache_init ())
+    {
+      g_message ("Failed to initialize nvti cache.");
+      exit (1);
+    }
   init_signal_handlers ();
 
   globals = g_malloc0 (sizeof (struct scan_globals));
@@ -414,7 +415,7 @@ stop_single_task_scan ()
     exit (1);
 
   pid = kb_item_get_int (kb, "internal/ovas_pid");
-  kill (pid, SIGUSR2);
+  kill (pid, SIGUSR1);
 
   exit (0);
 }
@@ -485,6 +486,7 @@ openvas (int argc, char *argv[])
 #ifdef OPENVAS_GIT_REVISION
       printf ("GIT revision %s\n", OPENVAS_GIT_REVISION);
 #endif
+      printf ("gvm-libs %s\n", gvm_libs_version ());
       printf ("Most new code since 2005: (C) 2019 Greenbone Networks GmbH\n");
       printf (
         "Nessus origin: (C) 2004 Renaud Deraison <deraison@nessus.org>\n");
