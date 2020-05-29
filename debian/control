@@ -2,17 +2,17 @@ Source: openvas
 Section: admin
 Priority: optional
 Maintainer: Mohammad Razavi <mrazavi64@gmail.com>
-Build-Depends: debhelper (>= 10), po-debconf, doxygen, xmltoman, cmake, pkg-config, libglib2.0-dev, libgcrypt11-dev, libgnutls28-dev, libpcap-dev, libgpgme-dev, libssh-dev, libksba-dev, bison, flex, libgvm-dev (>= 11.0.0), libopenvas-smb-dev
-Standards-Version: 4.1.2
+Build-Depends: debhelper-compat (= 12), po-debconf, doxygen, xmltoman, cmake, pkg-config, libglib2.0-dev, libgcrypt20-dev, libgnutls28-dev, libpcap-dev, libgpgme-dev, libssh-dev, libksba-dev, bison, flex, libgvm-dev (>= 11.0.1), libopenvas-smb-dev
+Standards-Version: 4.4.1
 Homepage: https://community.greenbone.net/
 Vcs-Git: https://github.com/admirito/openvas.git
 Vcs-Browser: https://github.com/admirito/openvas
 
 Package: openvas
 Architecture: any
-Pre-Depends: gnutls-bin (>= 3.0.11)
+Pre-Depends: gnutls-bin (>= 3.0.11), redis-server
 Depends: lsb-base, ${shlibs:Depends}, ${misc:Depends}
-Recommends: redis-server, nmap, rsync, curl, openvas-smb
+Recommends: nmap, rsync, curl, openvas-smb
 Conflicts: openvas-scanner, openvas9-scanner, libopenvas9, libopenvas9-dev
 Description: remote network security auditor - scanner
  The Greenbone Vulnerability Management Solution (previously known as

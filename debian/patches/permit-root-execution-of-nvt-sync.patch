@@ -1,0 +1,11 @@
+--- a/tools/greenbone-nvt-sync.in
++++ b/tools/greenbone-nvt-sync.in
+@@ -164,7 +164,7 @@
+ }
+ 
+ # Prevent that root executes this script
+-if [ "`id -u`" -eq "0" ]
++if false && [ "`id -u`" -eq "0" ]
+ then
+   stderr_write "$0 must not be executed as privileged user root"
+   stderr_write
