@@ -2,7 +2,7 @@ INSTALLATION INSTRUCTIONS FOR OPENVAS
 =====================================
 
 Please note: The reference system used by most of the developers is Debian
-GNU/Linux 'Stretch' 9. The build might fail on any other system. Also, it is
+GNU/Linux 'Buster' 10. The build might fail on any other system. Also, it is
 necessary to install dependent development packages.
 
 Prerequisites for openvas
@@ -11,7 +11,7 @@ Prerequisites for openvas
 Prerequisites:
 * a C compiler (e.g. gcc)
 * cmake >= 3.0
-* libgvm_base, libgvm_util >= 1.0.0
+* libgvm_base, libgvm_util >= 20.8
 * glib-2.0 >= 2.42
 * gio-2.0
 * bison
@@ -23,12 +23,11 @@ Prerequisites:
 * redis >= 3.2.0
 * libssh >= 0.6.0
 * libksba >= 1.0.7
-* libgnutls >= 3.2.15
+* libgnutls >= 3.6.4
 
 Prerequisites for building documentation:
 * Doxygen
 * xmltoman (optional, for building man page)
-* sqlfairy (optional, for producing database diagram)
 
 Prerequisites for building tests:
 * Cgreen (optional, for building tests)
@@ -40,12 +39,13 @@ Recommended for extended Windows support (e.g. automatically start the remote re
 * impacket-wmiexec of python-impacket >= 0.9.15 found within your PATH
 
 Recommended to have improved SNMP support:
-* netsnmp
+* netsnmp libraries or alternatively the snmpget binary.
 
-Install prerequisites on Debian GNU/Linux 'Stretch' 9:
+Install prerequisites on Debian GNU/Linux 'Buster' 10:
 
-    apt-get install gcc pkg-config libssh-gcrypt-dev libgnutls28-dev libglib2.0-dev \
-    libpcap-dev libgpgme-dev bison libksba-dev libsnmp-dev libgcrypt20-dev
+    apt-get install gcc pkg-config libssh-gcrypt-dev libgnutls28-dev \
+    libglib2.0-dev libpcap-dev libgpgme-dev bison libksba-dev libsnmp-dev \
+    libgcrypt20-dev redis-server
 
 
 Compiling openvas
@@ -132,12 +132,7 @@ Setting up an openvas requires the following steps:
    This tool will use the Greenbone Security Feed in case a Greenbone
    subscription key is present. Else, the Community Feed will be used.
 
-   Please note that you will need at least one of the following tools for a
-   successful synchronization:
-
-   * `rsync`
-   * `wget`
-   * `curl`
+   Please note that you will need the `rsync` tool for a successful synchronization.
 
    NVT feeds are updated on a regular basis. Be sure to update your NVT collection
    regularly to detect the latest threats.
@@ -156,17 +151,16 @@ Setting up an openvas requires the following steps:
    sudo systemctl start redis-server@openvas.service
    ```
 
-4. The scanner module does not run as a service as before any more. `gvmd`
-   can act as a client and control the scanner through the `OSPD-OpenVAS`
-   module. The actual user interfaces (for example GSA or GVM-Tools) will
-   only interact with `gvmd` and/or ospd-openvas, not the scanner.
-   You can launch openvas to upload the plugins in redis using the
-   following command:
+4. The Greenbone Vulnerability Management service (`gvmd`) acts as OSP client
+   to connect to and control scanners. openvas does not act as a OSP service -
+   you need the `OSPD-OpenVAS` module for this. The actual user interfaces (for
+   example GSA or GVM-Tools) will only interact with `gvmd` and/or
+   `ospd-openvas`, not the scanner. You can launch openvas to upload the
+   plugins in redis using the following command:
 
        openvas -u
 
-   but ospd-openvas will do the update automatically each time a new feed
-   is detected.
+   but `ospd-openvas` will do the update automatically.
 
 5. Please note that although you can run `openvas` as a user without elevated
    privileges, it is recommended that you start `openvas` as `root` since a
@@ -175,7 +169,7 @@ Setting up an openvas requires the following steps:
    a user without permission to perform these operations, your scan results
    are likely to be incomplete.
 
-   As `openvas` will be launched from an ospd-openvas process with sudo,
+   As `openvas` will be launched from an `ospd-openvas` process with sudo,
    the next configuration is required in the sudoers file:
 
        sudo visudo
@@ -204,7 +198,7 @@ ready when contacting the GVM developers via the Greenbone Community Portal
 or submitting bug reports at <https://github.com/greenbone/openvas/issues> as
 they may help to pinpoint the source of your issue.
 
-Logging is configured entirely by the file
+Logging is configured via the file
 
     <install-prefix>/etc/openvas/openvas_log.conf
 

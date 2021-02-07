@@ -91,13 +91,10 @@ tree_cell *
 safe_checks (lex_ctxt *);
 
 tree_cell *
-scan_phase (lex_ctxt *);
-
-tree_cell *
-network_targets (lex_ctxt *);
-
-tree_cell *
 get_script_oid (lex_ctxt *);
+
+tree_cell *
+get_host_kb_index (lex_ctxt *);
 
 tree_cell *
 get_kb_item (lex_ctxt *);

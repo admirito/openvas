@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -27,8 +27,9 @@
 
 #include "sighand.h"
 
-#include <errno.h> /* for errno() */
-#include <glib.h>  /* for g_error */
+#include <errno.h>            /* for errno() */
+#include <glib.h>             /* for g_error */
+#include <gvm/base/logging.h> /* for gvm_log_lock/unlock() */
 #include <setjmp.h>
 #include <signal.h>   /* for kill() */
 #include <stdlib.h>   /* for exit() */
@@ -79,7 +80,7 @@ terminate_process (pid_t pid)
 }
 
 static void
-init_child_signal_handlers ()
+init_child_signal_handlers (void)
 {
   /* SIGHUP is only for reloading main scanner process. */
   openvas_signal (SIGHUP, SIG_IGN);
@@ -98,7 +99,9 @@ create_process (process_func_t function, void *argument)
 {
   int pid;
 
+  gvm_log_lock ();
   pid = fork ();
+  gvm_log_unlock ();
 
   if (pid == 0)
     {

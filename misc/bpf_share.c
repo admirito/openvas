@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Copyright (C) 2003 Renaud Deraison
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -23,6 +23,8 @@
  * Eventually it needs to be analysed whether this makes sense
  * or can further be simplified. */
 
+#include "../nasl/nasl_debug.h" /* for nasl_*_filename */
+
 #include <gvm/base/logging.h>
 #include <pcap.h>
 
@@ -41,7 +43,7 @@ void
 print_pcap_error (pcap_t *p, char *prefix)
 {
   char *msg = pcap_geterr (p);
-  g_message ("%s : %s", prefix, msg);
+  g_message ("[%s] %s : %s", nasl_get_plugin_filename () ?: "", prefix, msg);
 }
 
 /**
@@ -53,6 +55,7 @@ bpf_open_live (char *iface, char *filter)
 {
   char errbuf[PCAP_ERRBUF_SIZE];
   pcap_t *ret;
+  pcap_if_t *alldevsp = NULL; /* list of capture devices */
   bpf_u_int32 netmask, network;
   struct bpf_program filter_prog;
   int i;
@@ -67,7 +70,12 @@ bpf_open_live (char *iface, char *filter)
     }
 
   if (iface == NULL)
-    iface = pcap_lookupdev (errbuf);
+    {
+      if (pcap_findalldevs (&alldevsp, errbuf) < 0)
+        g_message ("Error for pcap_findalldevs(): %s", errbuf);
+      if (alldevsp != NULL)
+        iface = alldevsp->name;
+    }
 
   ret = pcap_open_live (iface, 1500, 0, 1, errbuf);
   if (ret == NULL)
@@ -76,16 +84,18 @@ bpf_open_live (char *iface, char *filter)
       return -1;
     }
 
-  if (pcap_lookupnet (iface, &network, &netmask, 0) < 0)
+  if (pcap_lookupnet (iface, &network, &netmask, errbuf) < 0)
     {
-      g_message ("pcap_lookupnet failed");
+      g_message ("pcap_lookupnet failed: %s", errbuf);
       pcap_close (ret);
       return -1;
     }
 
   if (pcap_compile (ret, &filter_prog, filter, 1, netmask) < 0)
     {
-      print_pcap_error (ret, "pcap_compile");
+      char buffer[2048];
+      snprintf (buffer, sizeof (buffer), "pcap_compile: Filter \"%s\"", filter);
+      print_pcap_error (ret, buffer);
       pcap_close (ret);
       return -1;
     }
@@ -105,6 +115,9 @@ bpf_open_live (char *iface, char *filter)
     }
   pcaps[i] = ret;
   pcap_freecode (&filter_prog);
+  if (alldevsp != NULL)
+    pcap_freealldevs (alldevsp);
+
   return i;
 }
 

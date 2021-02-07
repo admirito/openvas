@@ -1,4 +1,4 @@
-/* Copyright (C) 2014-2019 Greenbone Networks GmbH
+/* Copyright (C) 2014-2021 Greenbone Networks GmbH
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -22,8 +22,6 @@
  * @brief Headers of an API for SNMP used by NASL scripts.
  */
 
-#ifdef HAVE_NETSNMP
-
 tree_cell *
 nasl_snmpv1_get (lex_ctxt *);
 
@@ -32,5 +30,3 @@ nasl_snmpv2c_get (lex_ctxt *);
 
 tree_cell *
 nasl_snmpv3_get (lex_ctxt *);
-
-#endif /* HAVE_NETSNMP */

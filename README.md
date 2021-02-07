@@ -3,8 +3,8 @@
 # OpenVAS
 
 [![GitHub releases](https://img.shields.io/github/release/greenbone/openvas.svg)](https://github.com/greenbone/openvas/releases)
-[![Code Documentation Coverage](https://img.shields.io/codecov/c/github/greenbone/openvas/openvas-7.0.svg?label=Doc%20Coverage&logo=codecov)](https://codecov.io/gh/greenbone/openvas)
-[![CircleCI](https://circleci.com/gh/greenbone/openvas/tree/openvas-7.0.svg?style=svg)](https://circleci.com/gh/greenbone/openvas/tree/openvas-7.0)
+[![Code Documentation Coverage](https://img.shields.io/codecov/c/github/greenbone/openvas/openvas-20.08.svg?label=Doc%20Coverage&logo=codecov)](https://codecov.io/gh/greenbone/openvas)
+[![CircleCI](https://circleci.com/gh/greenbone/openvas/tree/openvas-20.08.svg?style=svg)](https://circleci.com/gh/greenbone/openvas/tree/openvas-20.08)
 
 This is the Open Vulnerability Assessment Scanner (OpenVAS) of the
 Greenbone Vulnerability Management (GVM) Solution.
@@ -32,9 +32,9 @@ For detailed installation requirements and instructions, please see the file
 `openvas` and for making the scanner available to other GVM modules.
 
 If you are not familiar or comfortable building from source code, we recommend
-that you use the Greenbone Community Edition, a prepared virtual machine with a
-readily available setup. Information regarding the virtual machine is available
-at <https://www.greenbone.net/en/community-edition/>.
+that you use the Greenbone Security Manager TRIAL (GSM TRIAL), a prepared virtual
+machine with a readily available setup. Information regarding the virtual machine
+is available at <https://www.greenbone.net/en/testnow>.
 
 ## Support
 

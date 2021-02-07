@@ -48,6 +48,7 @@ init_capture_device (struct in_addr src, struct in_addr dest, char *filter)
   char *a_dst, *a_src;
   char errbuf[PCAP_ERRBUF_SIZE];
   int free_filter = 0;
+  pcap_if_t *alldevsp = NULL; /* list of capture devices */
 
   a_src = g_strdup (inet_ntoa (src));
   a_dst = g_strdup (inet_ntoa (dest));
@@ -72,12 +73,24 @@ init_capture_device (struct in_addr src, struct in_addr dest, char *filter)
   g_free (a_dst);
   g_free (a_src);
 
-  if ((interface = routethrough (&src, &dest))
-      || (interface = pcap_lookupdev (errbuf)))
-    ret = bpf_open_live (interface, filter);
+  if ((interface = routethrough (&src, &dest)))
+    {
+      ret = bpf_open_live (interface, filter);
+    }
+  else
+    {
+      if (pcap_findalldevs (&alldevsp, errbuf) < 0)
+        g_message ("Error for pcap_findalldevs(): %s", errbuf);
+      if (alldevsp != NULL)
+        interface = alldevsp->name;
+      ret = bpf_open_live (interface, filter);
+    }
 
   if (free_filter != 0)
     g_free (filter);
+
+  if (alldevsp != NULL)
+    pcap_freealldevs (alldevsp);
 
   return ret;
 }
@@ -136,7 +149,7 @@ capture_next_packet (int bpf, int timeout, int *sz)
       if (sz != NULL)
         *sz = len - dl_len;
     }
-  return (struct ip *) ret;
+  return ((struct ip *) ret);
 }
 
 int
@@ -148,6 +161,7 @@ init_v6_capture_device (struct in6_addr src, struct in6_addr dest, char *filter)
   int free_filter = 0;
   char name[INET6_ADDRSTRLEN];
   char errbuf[PCAP_ERRBUF_SIZE];
+  pcap_if_t *alldevsp = NULL; /* list of capture devices */
 
   a_src = g_strdup (inet_ntop (AF_INET6, &src, name, INET6_ADDRSTRLEN));
   a_dst = g_strdup (inet_ntop (AF_INET6, &dest, name, INET6_ADDRSTRLEN));
@@ -172,12 +186,24 @@ init_v6_capture_device (struct in6_addr src, struct in6_addr dest, char *filter)
   g_free (a_dst);
   g_free (a_src);
 
-  if ((interface = v6_routethrough (&src, &dest))
-      || (interface = pcap_lookupdev (errbuf)))
-    ret = bpf_open_live (interface, filter);
+  if ((interface = v6_routethrough (&src, &dest)))
+    {
+      ret = bpf_open_live (interface, filter);
+    }
+  else
+    {
+      if (pcap_findalldevs (&alldevsp, errbuf) < 0)
+        g_message ("Error for pcap_findalldevs(): %s", errbuf);
+      if (alldevsp != NULL)
+        interface = alldevsp->name;
+      ret = bpf_open_live (interface, filter);
+    }
 
   if (free_filter != 0)
     g_free (filter);
+
+  if (alldevsp != NULL)
+    pcap_freealldevs (alldevsp);
 
   return ret;
 }
@@ -237,5 +263,5 @@ capture_next_v6_packet (int bpf, int timeout, int *sz)
         *sz = len - dl_len;
     }
 
-  return (struct ip6_hdr *) ret;
+  return ((struct ip6_hdr *) ret);
 }

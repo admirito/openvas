@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -62,6 +62,8 @@ plugin_add (plugins_scheduler_t sched, GHashTable *oids_table,
   int category;
   nvti_t *nvti;
   int ret = 0;
+  gchar *tag_value;
+
   if (g_hash_table_lookup (oids_table, oid))
     return 0;
 
@@ -73,9 +75,8 @@ plugin_add (plugins_scheduler_t sched, GHashTable *oids_table,
       return 1;
     }
 
-  if (nvti_tag (nvti)
-      && (g_str_has_prefix (nvti_tag (nvti), "deprecated=1")
-          || strstr (nvti_tag (nvti), "|deprecated=1")))
+  tag_value = nvti_get_tag (nvti, "deprecated");
+  if (tag_value && !strcmp (tag_value, "1"))
     {
       if (prefs_get_bool ("log_whole_attack"))
         {
@@ -86,6 +87,7 @@ plugin_add (plugins_scheduler_t sched, GHashTable *oids_table,
           g_free (name);
         }
       nvti_free (nvti);
+      g_free (tag_value);
       return 0;
     }
 
@@ -310,23 +312,13 @@ check_dependency_cycles (plugins_scheduler_t sched)
 }
 
 plugins_scheduler_t
-plugins_scheduler_init (const char *plugins_list, int autoload,
-                        int only_network, int *error)
+plugins_scheduler_init (const char *plugins_list, int autoload, int *error)
 {
   plugins_scheduler_t ret;
-  int i;
 
   /* Fill our lists */
   ret = g_malloc0 (sizeof (*ret));
   *error = plugins_scheduler_enable (ret, plugins_list, autoload);
-
-  if (only_network)
-    {
-      for (i = ACT_GATHER_INFO; i <= ACT_END; i++)
-        {
-          ret->list[i] = NULL;
-        }
-    }
 
   if (check_dependency_cycles (ret))
     {

@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -299,7 +299,7 @@ pluginlaunch_enable_parallel_checks (void)
 }
 
 void
-pluginlaunch_stop ()
+pluginlaunch_stop (void)
 {
   int i;
 
@@ -381,7 +381,7 @@ pluginlaunch_wait (kb_t kb)
  * @brief Return shortest timeout of the running processes.
  */
 static int
-timeout_running_processes ()
+timeout_running_processes (void)
 {
   int i, timeout = 0;
 
@@ -417,7 +417,7 @@ pluginlaunch_wait_for_free_process (kb_t kb)
       sigemptyset (&mask);
       sigaddset (&mask, SIGCHLD);
       if (sigtimedwait (&mask, NULL, &ts) < 0 && errno != EAGAIN)
-        g_warning ("%s: %s", __FUNCTION__, strerror (errno));
+        g_warning ("%s: %s", __func__, strerror (errno));
       update_running_processes (kb);
     }
 }

@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2019 Greenbone Networks GmbH
+# Copyright (C) 2011-2021 Greenbone Networks GmbH
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -26,8 +26,9 @@ if (NOT PKG_CONFIG_FOUND)
   message(FATAL_ERROR "pkg-config executable not found. Aborting.")
 endif (NOT PKG_CONFIG_FOUND)
 
-pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=11.0.1)
-pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=11.0.0)
+pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=20.8)
+pkg_check_modules (LIBGVM_BOREAS REQUIRED libgvm_boreas>=20.8)
+pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=20.8)
 pkg_check_modules (GLIB REQUIRED glib-2.0>=2.42)
 
 # set NVTICACHE_STR with version.
@@ -57,6 +58,32 @@ else (NOT GCRYPT)
   endif (GCRYPT_VERSION VERSION_LESS "1.6")
   string(REPLACE "-I" "" GCRYPT_INCLUDE_DIRS "${GCRYPT_CFLAGS}")
 endif (NOT GCRYPT)
+
+message (STATUS "Looking for pcap...")
+find_library (PCAP pcap)
+message (STATUS "Looking for pcap... ${PCAP}")
+if (NOT PCAP)
+  message (SEND_ERROR "The pcap library is required.")
+endif (NOT PCAP)
+
+message (STATUS "Looking for pcap-config...")
+find_program (PCAP_CONFIG pcap-config)
+
+if (PCAP_CONFIG)
+  message (STATUS "Looking for pcap-config... ${PCAP_CONFIG}")
+  execute_process (COMMAND pcap-config --libs
+    OUTPUT_VARIABLE PCAP_LDFLAGS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process (COMMAND pcap-config --cflags
+    OUTPUT_VARIABLE PCAP_CFLAGS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+else (PCAP_CONFIG)
+  message (STATUS "pcap-config not found, using defaults...")
+  set (PCAP_LDFLAGS "-L/usr/lib -lpcap")
+  set (PCAP_CFLAGS "-I/usr/include")
+endif (PCAP_CONFIG)
+
+find_package (Threads)
 
 add_executable (openvas attack.c hosts.c
                 main.c nasl_plugins.c openvas.c
@@ -140,20 +167,19 @@ if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
   set (EXECINFO_LDFLAGS "execinfo")
 endif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 
-
 target_link_libraries (openvas openvas_nasl_shared ${LIBOPENVAS_NASL_LDFLAGS}
                        ${LIBOPENVAS_MISC_LDFLAGS}
                        ${LIBGVM_BASE_LDFLAGS}
+                       ${LIBGVM_BOREAS_LDFLAGS}
                        ${GLIB_LDFLAGS} ${GCRYPT_LDFLAGS}
-                       ${EXECINFO_LDFLAGS}
-                       ${LINKER_HARDENING_FLAGS})
+                       ${EXECINFO_LDFLAGS} ${PCAP_LDFLAGS}
+                       ${LINKER_HARDENING_FLAGS} ${CMAKE_THREAD_LIBS_INIT})
 
 ## Tests
 
 add_executable (attack-test
                 EXCLUDE_FROM_ALL
                 attack_tests.c
-
                 hosts.c nasl_plugins.c openvas.c
                 pluginlaunch.c pluginload.c
                 pluginscheduler.c plugs_req.c
@@ -167,13 +193,11 @@ target_link_libraries (attack-test openvas_nasl_shared cgreen
                        ${LIBOPENVAS_NASL_LDFLAGS}
                        ${LIBOPENVAS_MISC_LDFLAGS}
                        ${LIBGVM_BASE_LDFLAGS}
+                       ${LIBGVM_BOREAS_LDFLAGS}
                        ${GLIB_LDFLAGS} ${GCRYPT_LDFLAGS}
-                       ${EXECINFO_LDFLAGS}
-                       ${LINKER_HARDENING_FLAGS}
+                       ${EXECINFO_LDFLAGS} ${PCAP_LDFLAGS}
+                       ${LINKER_HARDENING_FLAGS} ${CMAKE_THREAD_LIBS_INIT}
                        -Wl,--wrap=redis_push_str)
-
-add_custom_target (tests
-                   DEPENDS attack-test)
 
 ## Static analysis
 

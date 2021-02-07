@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Based on work Copyright (C) 1998 - 2003 Renaud Deraison
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -98,9 +98,9 @@ static int
 unscanned_ports_as_closed (port_protocol_t ptype)
 {
   if (ptype == PORT_PROTOCOL_UDP)
-    return prefs_get_bool ("unscanned_closed_udp") ? 0 : 1;
+    return (prefs_get_bool ("unscanned_closed_udp") ? 0 : 1);
 
-  return prefs_get_bool ("unscanned_closed") ? 0 : 1;
+  return (prefs_get_bool ("unscanned_closed") ? 0 : 1);
 }
 
 /**
@@ -153,27 +153,31 @@ host_get_port_state_proto (struct script_infos *args, int portnum, char *proto)
 int
 host_get_port_state (struct script_infos *plugdata, int portnum)
 {
-  return host_get_port_state_proto (plugdata, portnum, "tcp");
+  return (host_get_port_state_proto (plugdata, portnum, "tcp"));
 }
 
 int
 host_get_port_state_udp (struct script_infos *plugdata, int portnum)
 {
-  return host_get_port_state_proto (plugdata, portnum, "udp");
+  return (host_get_port_state_proto (plugdata, portnum, "udp"));
 }
 
-int
-plug_add_host_fqdn (struct script_infos *args, const char *hostname,
-                    const char *source)
+/**
+ * @brief Check for  duplicated vhosts before inserting a new one.
+ *
+ * @param args script info structure
+ * @param hostname  hostname to check
+ *
+ * @return 0 if the vhosts was still not added. -1 if the vhosts already exists.
+ */
+static int
+check_duplicated_vhost (struct script_infos *args, const char *hostname)
 {
-  gvm_vhost_t *vhost;
-  GSList *vhosts;
-  char **excluded;
+  GSList *vhosts = NULL;
+  kb_t host_kb = NULL;
+  struct kb_item *current_vhosts = NULL;
 
-  if (!prefs_get_bool ("expand_vhosts") || !hostname || !source)
-    return -1;
-
-  /* Check for duplicate vhost value. */
+  /* Check for duplicate vhost value in args. */
   vhosts = args->vhosts;
   while (vhosts)
     {
@@ -181,11 +185,48 @@ plug_add_host_fqdn (struct script_infos *args, const char *hostname,
 
       if (!strcmp (tmp->value, hostname))
         {
-          g_warning ("%s: Value '%s' exists already", __FUNCTION__, hostname);
+          g_warning ("%s: Value '%s' exists already", __func__, hostname);
           return -1;
         }
       vhosts = vhosts->next;
     }
+
+  /* Check for duplicate vhost value already added by other forked child of the
+   * same plugin. */
+  host_kb = args->key;
+  current_vhosts = kb_item_get_all (host_kb, "internal/vhosts");
+  if (!current_vhosts)
+    return 0;
+
+  while (current_vhosts)
+    {
+      if (!strcmp (current_vhosts->v_str, hostname))
+        {
+          g_warning ("%s: Value '%s' exists already", __func__, hostname);
+          kb_item_free (current_vhosts);
+
+          return -1;
+        }
+      current_vhosts = current_vhosts->next;
+    }
+
+  kb_item_free (current_vhosts);
+  return 0;
+}
+
+int
+plug_add_host_fqdn (struct script_infos *args, const char *hostname,
+                    const char *source)
+{
+  gvm_vhost_t *vhost;
+  char **excluded;
+
+  if (!prefs_get_bool ("expand_vhosts") || !hostname || !source)
+    return -1;
+
+  if (check_duplicated_vhost (args, hostname))
+    return -1;
+
   /* Check for excluded vhost value. */
   if (prefs_get ("exclude_hosts"))
     {
@@ -302,10 +343,12 @@ plug_get_host_ip_str (struct script_infos *desc)
  * @param proto Protocol related to the issue (tcp or udp).
  * @param action The actual result text
  * @param what   The type, like "LOG".
+ * @param uri   Location like file path or webservice URL.
  */
 void
 proto_post_wrapped (const char *oid, struct script_infos *desc, int port,
-                    const char *proto, const char *action, const char *what)
+                    const char *proto, const char *action, const char *what,
+                    const char *uri)
 {
   const char *hostname = "";
   char *buffer, *data, port_s[16] = "general";
@@ -333,8 +376,9 @@ proto_post_wrapped (const char *oid, struct script_infos *desc, int port,
   else if (desc->vhosts)
     hostname = ((gvm_vhost_t *) desc->vhosts->data)->value;
   addr6_to_str (plug_get_host_ip (desc), ip_str);
-  buffer = g_strdup_printf ("%s|||%s|||%s/%s|||%s|||%s", what, hostname ?: " ",
-                            port_s, proto, oid, action_str->str);
+  buffer =
+    g_strdup_printf ("%s|||%s|||%s/%s|||%s|||%s|||%s", what, hostname ?: " ",
+                     port_s, proto, oid, action_str->str, uri ?: "");
   /* Convert to UTF-8 before sending to Manager. */
   data = g_convert (buffer, -1, "UTF-8", "ISO_8859-1", NULL, &length, NULL);
   kb = plug_get_kb (desc);
@@ -346,16 +390,16 @@ proto_post_wrapped (const char *oid, struct script_infos *desc, int port,
 
 void
 proto_post_alarm (const char *oid, struct script_infos *desc, int port,
-                  const char *proto, const char *action)
+                  const char *proto, const char *action, const char *uri)
 {
-  proto_post_wrapped (oid, desc, port, proto, action, "ALARM");
+  proto_post_wrapped (oid, desc, port, proto, action, "ALARM", uri);
 }
 
 void
 post_alarm (const char *oid, struct script_infos *desc, int port,
-            const char *action)
+            const char *action, const char *uri)
 {
-  proto_post_alarm (oid, desc, port, "tcp", action);
+  proto_post_alarm (oid, desc, port, "tcp", action, uri);
 }
 
 /**
@@ -363,9 +407,9 @@ post_alarm (const char *oid, struct script_infos *desc, int port,
  */
 void
 proto_post_log (const char *oid, struct script_infos *desc, int port,
-                const char *proto, const char *action)
+                const char *proto, const char *action, const char *uri)
 {
-  proto_post_wrapped (oid, desc, port, proto, action, "LOG");
+  proto_post_wrapped (oid, desc, port, proto, action, "LOG", uri);
 }
 
 /**
@@ -375,21 +419,31 @@ void
 post_log (const char *oid, struct script_infos *desc, int port,
           const char *action)
 {
-  proto_post_log (oid, desc, port, "tcp", action);
+  proto_post_log (oid, desc, port, "tcp", action, NULL);
+}
+
+/**
+ * @brief Post a log message about a tcp port with a uri
+ */
+void
+post_log_with_uri (const char *oid, struct script_infos *desc, int port,
+                   const char *action, const char *uri)
+{
+  proto_post_log (oid, desc, port, "tcp", action, uri);
 }
 
 void
 proto_post_error (const char *oid, struct script_infos *desc, int port,
-                  const char *proto, const char *action)
+                  const char *proto, const char *action, const char *uri)
 {
-  proto_post_wrapped (oid, desc, port, proto, action, "ERRMSG");
+  proto_post_wrapped (oid, desc, port, proto, action, "ERRMSG", uri);
 }
 
 void
 post_error (const char *oid, struct script_infos *desc, int port,
-            const char *action)
+            const char *action, const char *uri)
 {
-  proto_post_error (oid, desc, port, "tcp", action);
+  proto_post_error (oid, desc, port, "tcp", action, uri);
 }
 
 /**
@@ -460,7 +514,17 @@ get_plugin_preference (const char *oid, const char *name, int pref_id)
           if ((cname && !strcmp (cname, nvtpref_name (tmp->data)))
               || (pref_id >= 0 && pref_id == nvtpref_id (tmp->data)))
             {
-              retval = g_strdup (nvtpref_default (tmp->data));
+              if (!strcmp (nvtpref_type (tmp->data), "radio"))
+                {
+                  char **opts =
+                    g_strsplit (nvtpref_default (tmp->data), ";", -1);
+
+                  retval = g_strdup (opts[0]);
+                  g_strfreev (opts);
+                }
+              else
+                retval = g_strdup (nvtpref_default (tmp->data));
+
               break;
             }
           tmp = tmp->next;

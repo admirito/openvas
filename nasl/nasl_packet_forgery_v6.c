@@ -104,19 +104,28 @@ int n;
   sum = (sum >> 16) + (sum & 0xffff); /* add hi 16 to low 16 */
   sum += (sum >> 16);                 /* add carry */
   answer = (int) ~sum;                /* ones-complement, truncate */
-  return answer;
+  return (answer);
 }
 
 /*--------------[ IP ]--------------------------------------------*/
+
 /**
- * @brief Forge IPv6 packet.
+ * @brief Forge an IPv6 packet.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic     Lexical context of NASL interpreter.
+ * @param[in] data      Data payload
+ * @param[in] ip6_v     Version. 6 by default.
+ * @param[in] ip6_tc    Traffic class. 0 by default.
+ * @param[in] ip6_fl    Flow label. 0 by default.
+ * @param[in] ip6_p     IP protocol. 0 by default.
+ * @param[in] ip6_hlim  Hop limit. Max. 255. 64 by default.
+ * @param[in] ip6_src   Source address.
+ * @param[in] ip6_dst   Destination address.
  *
- * @return tree_cell with the forged IP packet.
+ * @return Forged IP packet.
  */
 tree_cell *
-forge_ipv6_packet (lex_ctxt *lexic)
+forge_ip_v6_packet (lex_ctxt *lexic)
 {
   tree_cell *retc;
   struct ip6_hdr *pkt;
@@ -147,7 +156,7 @@ forge_ipv6_packet (lex_ctxt *lexic)
   tc = get_int_var_by_name (lexic, "ip6_tc", 0);
   fl = get_int_var_by_name (lexic, "ip6_fl", 0);
 
-  pkt->ip6_ctlun.ip6_un1.ip6_un1_flow = version | tc | fl;
+  pkt->ip6_flow = htonl (version << 28 | tc << 20 | fl);
 
   pkt->ip6_plen = FIX (data_len); /* No extension headers ? */
   pkt->ip6_nxt = get_int_var_by_name (lexic, "ip6_p", 0);
@@ -180,50 +189,62 @@ forge_ipv6_packet (lex_ctxt *lexic)
 /**
  * @brief Obtain IPv6 header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic      Lexical context of NASL interpreter.
+ * @param[in] ipv6       IPv6 header. TODO: Once versions older than 20.08 are
+ * no longer in use the parameter name can be changed to 'ip6'.
+ * @param[in] element    Element to extract from the header.
  *
  * @return tree_cell with the IP header element.
  */
 tree_cell *
-get_ipv6_element (lex_ctxt *lexic)
+get_ip_v6_element (lex_ctxt *lexic)
 {
   tree_cell *retc;
-  struct ip6_hdr *ip6 = (struct ip6_hdr *) get_str_var_by_name (lexic, "ipv6");
   char *element = get_str_var_by_name (lexic, "element");
   char ret_ascii[INET6_ADDRSTRLEN];
   int ret_int = 0;
   int flag = 0;
+  struct ip6_hdr *ip6;
 
+  /* Parameter name 'ipv6' was renamed to 'ip6' for consistency.
+   * For backwards compatibility reasons we still need to consider the 'ipv6'
+   * argument.
+   */
+  ip6 = (struct ip6_hdr *) get_str_var_by_name (lexic, "ipv6");
   if (ip6 == NULL)
     {
-      nasl_perror (lexic, "get_ipv6_element : no valid 'ip' argument!\n");
-      return NULL;
+      ip6 = (struct ip6_hdr *) get_str_var_by_name (lexic, "ip6");
+      if (ip6 == NULL)
+        {
+          nasl_perror (lexic, "%s: no valid 'ip6' argument\n", __func__);
+          return NULL;
+        }
     }
 
   if (element == NULL)
     {
-      nasl_perror (lexic, "get_ipv6_element : no valid 'element' argument!\n");
+      nasl_perror (lexic, "%s: no valid 'element' argument\n", __func__);
       return NULL;
     }
 
   if (!strcmp (element, "ip6_v"))
     {
-      ret_int = (ip6->ip6_flow & 0x3ffff);
+      ret_int = ntohl (ip6->ip6_flow) >> 28;
       flag++;
     }
   else if (!strcmp (element, "ip6_tc"))
     {
-      ret_int = (ip6->ip6_flow >> 20) & 0xff;
+      ret_int = (ntohl (ip6->ip6_flow) >> 20) & 0xff;
       flag++;
     }
   else if (!strcmp (element, "ip6_fl"))
     {
-      ret_int = ip6->ip6_flow >> 28;
+      ret_int = ntohl (ip6->ip6_flow) & 0x3ffff;
       flag++;
     }
   else if (!strcmp (element, "ip6_plen"))
     {
-      ret_int = (ip6->ip6_plen);
+      ret_int = UNFIX (ip6->ip6_plen);
       flag++;
     }
   else if (!strcmp (element, "ip6_nxt"))
@@ -257,7 +278,7 @@ get_ipv6_element (lex_ctxt *lexic)
 
   if (flag == 0)
     {
-      printf ("%s : unknown element\n", element);
+      nasl_perror (lexic, "%s : unknown element '%s'\n", __func__, element);
       return NULL;
     }
 
@@ -271,12 +292,17 @@ get_ipv6_element (lex_ctxt *lexic)
 /**
  * @brief Set IPv6 header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic     Lexical context of NASL interpreter.
+ * @param[in] ip6       IP v6 header.
+ * @param[in] ip6_plen  Payload length.
+ * @param[in] ip6_hlim  Hop limit. Max. 255
+ * @param[in] ip6_nxt   Next packet.
+ * @param[in] ip6_src   Source address
  *
  * @return tree_cell with the forged IP packet.
  */
 tree_cell *
-set_ipv6_elements (lex_ctxt *lexic)
+set_ip_v6_elements (lex_ctxt *lexic)
 {
   struct ip6_hdr *o_pkt = (struct ip6_hdr *) get_str_var_by_name (lexic, "ip6");
   int size = get_var_size_by_name (lexic, "ip6");
@@ -286,7 +312,7 @@ set_ipv6_elements (lex_ctxt *lexic)
 
   if (o_pkt == NULL)
     {
-      nasl_perror (lexic, "set_ip_elements: missing <ip> field\n");
+      nasl_perror (lexic, "%s: missing <ip6> field\n", __func__);
       return NULL;
     }
 
@@ -311,12 +337,13 @@ set_ipv6_elements (lex_ctxt *lexic)
 /**
  * @brief Print IPv6 Header.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ...     IPv6 datagrams to dump.
  *
  * @return Print and returns FAKE_CELL.
  */
 tree_cell *
-dump_ipv6_packet (lex_ctxt *lexic)
+dump_ip_v6_packet (lex_ctxt *lexic)
 {
   int i;
   char addr[INET6_ADDRSTRLEN];
@@ -330,13 +357,12 @@ dump_ipv6_packet (lex_ctxt *lexic)
       else
         {
           printf ("------\n");
-          printf ("\tip6_v  : %d\n", ip6->ip6_flow >> 28);
-          printf ("\tip6_tc: %d\n", (ip6->ip6_flow >> 20) & 0xff);
-          printf ("\tip6_fl: %d\n", (ip6->ip6_flow) & 0x3ffff);
-          printf ("\tip6_plen: %d\n", UNFIX (ip6->ip6_plen));
-          printf ("\tip6_nxt : %d\n", ntohs (ip6->ip6_nxt));
-          printf ("\tip6_hlim : %d\n", ntohs (ip6->ip6_hlim));
-          switch (ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt)
+          printf ("\tip6_v    : %d\n", ntohl (ip6->ip6_flow) >> 28);
+          printf ("\tip6_tc   : %d\n", (ntohl (ip6->ip6_flow) >> 20) & 0xff);
+          printf ("\tip6_fl   : %d\n", ntohl (ip6->ip6_flow) & 0x3ffff);
+          printf ("\tip6_plen : %d\n", UNFIX (ip6->ip6_plen));
+          printf ("\tip6_hlim : %d\n", ip6->ip6_hlim);
+          switch (ip6->ip6_nxt)
             {
             case IPPROTO_TCP:
               printf ("\tip6_nxt  : IPPROTO_TCP (%d)\n", ip6->ip6_nxt);
@@ -344,16 +370,16 @@ dump_ipv6_packet (lex_ctxt *lexic)
             case IPPROTO_UDP:
               printf ("\tip6_nxt  : IPPROTO_UDP (%d)\n", ip6->ip6_nxt);
               break;
-            case IPPROTO_ICMP:
-              printf ("\tip6_nxt  : IPPROTO_ICMP (%d)\n", ip6->ip6_nxt);
+            case IPPROTO_ICMPV6:
+              printf ("\tip6_nxt  : IPPROTO_ICMPV6 (%d)\n", ip6->ip6_nxt);
               break;
             default:
               printf ("\tip6_nxt  : %d\n", ip6->ip6_nxt);
               break;
             }
-          printf ("\tip6_src: %s\n",
+          printf ("\tip6_src  : %s\n",
                   inet_ntop (AF_INET6, &ip6->ip6_src, addr, sizeof (addr)));
-          printf ("\tip6_dst: %s\n",
+          printf ("\tip6_dst  : %s\n",
                   inet_ntop (AF_INET6, &ip6->ip6_dst, addr, sizeof (addr)));
           printf ("\n");
         }
@@ -362,8 +388,20 @@ dump_ipv6_packet (lex_ctxt *lexic)
   return FAKE_CELL;
 }
 
+/**
+ * @brief Adds an IPv6 option to the datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ip6     IPv6 packet.
+ * @param[in] data    Data payload.
+ * @param[in] code    Code of option.
+ * @param[in] length  Length of value.
+ * @param[in] value   Value of the option.
+ *
+ * @return the modified datagram.
+ */
 tree_cell *
-insert_ipv6_options (lex_ctxt *lexic)
+insert_ip_v6_options (lex_ctxt *lexic)
 {
   struct ip6_hdr *ip6 = (struct ip6_hdr *) get_str_var_by_name (lexic, "ip6");
   int code = get_int_var_by_name (lexic, "code", 0);
@@ -382,8 +420,10 @@ insert_ipv6_options (lex_ctxt *lexic)
 
   if (ip6 == NULL)
     {
-      nasl_perror (lexic, "Usage : insert_ipv6_options(ip6:<ip6>, code:<code>, "
-                          "length:<len>, value:<value>\n");
+      nasl_perror (lexic,
+                   "Usage : %s(ip6:<ip6>, code:<code>, "
+                   "length:<len>, value:<value>\n",
+                   __func__);
       return NULL;
     }
 
@@ -443,7 +483,19 @@ struct v6pseudohdr
 /**
  * @brief Forge TCP packet.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic     Lexical context of NASL interpreter.
+ * @param[in] ip6       IPv6 packet.
+ * @param[in] data      Data.
+ * @param[in] th_sport  Source port. 0 by default.
+ * @param[in] th_dport  Destination port. 0 by default.
+ * @param[in] th_seq    Sequence number. Random by default.
+ * @param[in] th_ack    Acknowledgement number. 0 by default.
+ * @param[in] th_x2     0 by default.
+ * @param[in] th_off    Data offset. 5 by default.
+ * @param[in] th_flags  Flags. 0 by default.
+ * @param[in] th_win    Window. 0 by default.
+ * @param[in] th_sum    Checksum. Is filled in automatically by default
+ * @param[in] th_urp    Urgent pointer. 0 by default.
  *
  * @return tree_cell with the forged TCP packet containing IPv6 header.
  */
@@ -461,7 +513,7 @@ forge_tcp_v6_packet (lex_ctxt *lexic)
   if (ip6 == NULL)
     {
       nasl_perror (lexic,
-                   "forge_tcp_packet : You must supply the 'ip' argument !");
+                   "forge_tcp_v6_packet: You must supply the 'ip6' argument\n");
       return NULL;
     }
 
@@ -528,7 +580,10 @@ forge_tcp_v6_packet (lex_ctxt *lexic)
 /**
  * @brief Get TCP Header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] tcp     IPv6 packet
+ * @param[in] element Element to extract from the header (see
+ * forge_tcp_v6_packet()).
  *
  * @return tree_cell with the forged IP packet.
  */
@@ -547,8 +602,7 @@ get_tcp_v6_element (lex_ctxt *lexic)
 
   if (packet == NULL)
     {
-      nasl_perror (lexic,
-                   "get_tcp_element : Error ! No valid 'tcp' argument !\n");
+      nasl_perror (lexic, "get_tcp_v6_element: No valid 'tcp' argument\n");
       return NULL;
     }
 
@@ -563,8 +617,7 @@ get_tcp_v6_element (lex_ctxt *lexic)
   element = get_str_var_by_name (lexic, "element");
   if (!element)
     {
-      nasl_perror (lexic,
-                   "get_tcp_element : Error ! No valid 'element' argument !\n");
+      nasl_perror (lexic, "get_tcp_v6_element: No valid 'element' argument\n");
       return NULL;
     }
 
@@ -592,9 +645,11 @@ get_tcp_v6_element (lex_ctxt *lexic)
     {
       retc = alloc_typed_cell (CONST_DATA);
       retc->size = UNFIX (ip6->ip6_plen) - tcp->th_off * 4;
-      if (retc->size <= 0 || retc->size > ipsz - 40 - tcp->th_off * 4)
+      if (retc->size < 0 || retc->size > ipsz - 40 - tcp->th_off * 4)
         {
-          nasl_perror (lexic, "Erroneous tcp header offset %d", retc->size);
+          nasl_perror (lexic,
+                       "get_tcp_v6_element: Erroneous tcp header offset %d\n",
+                       retc->size);
           deref_cell (retc);
           return NULL;
         }
@@ -604,7 +659,8 @@ get_tcp_v6_element (lex_ctxt *lexic)
     }
   else
     {
-      nasl_perror (lexic, "Unknown tcp field %s\n", element);
+      nasl_perror (lexic, "get_tcp_v6_element: Unknown tcp field %s\n",
+                   element);
       return NULL;
     }
 
@@ -616,9 +672,23 @@ get_tcp_v6_element (lex_ctxt *lexic)
 /**
  * @brief Set TCP Header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic     Lexical context of NASL interpreter.
+ * @param[in] tcp       IPv6 packet to modify.
+ * @param[in] data      Data.
+ * @param[in] th_sport  Source port.
+ * @param[in] th_dport  Destination port.
+ * @param[in] th_seq    Sequence number.
+ * @param[in] th_ack    Acknowledgement number.
+ * @param[in] th_x2
+ * @param[in] th_off    Data offset.
+ * @param[in] th_flags  Flags.
+ * @param[in] th_win    Window.
+ * @param[in] th_sum    Checksum.
+ * @param[in] th_urp    Urgent pointer.
+ * @param[in] update_ip_len  Flag (TRUE by default). If set, NASL will recompute
+ * the size field of the IP datagram.
  *
- * @return tree_cell with the forged TCP packet and IPv6.
+ * @return tree_cell with the modified IPv6 datagram.
  */
 tree_cell *
 set_tcp_v6_elements (lex_ctxt *lexic)
@@ -634,8 +704,8 @@ set_tcp_v6_elements (lex_ctxt *lexic)
 
   if (pkt == NULL)
     {
-      nasl_perror (lexic,
-                   "set_tcp_elements : Invalid value for the argument 'tcp'\n");
+      nasl_perror (
+        lexic, "set_tcp_v6_elements: Invalid value for the argument 'tcp'\n");
       return NULL;
     }
 
@@ -709,9 +779,10 @@ set_tcp_v6_elements (lex_ctxt *lexic)
 }
 
 /**
- * @brief Print TCP/IPv6 packet.
+ * @brief Dump TCP part of an IPv6 Datagram.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ...     IPv6 datagrams to dump.
  *
  * @return Print and return FAKE_CELL.
  */
@@ -817,9 +888,16 @@ struct v6pseudo_udp_hdr
 };
 
 /*
- * @brief Forge v6 packet for UDP.
+ * @brief Fills an IPv6 datagram with UDP data.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic           Lexical context of NASL interpreter.
+ * @param[in] ip6             IPv6 packet.
+ * @param[in] data            Data.
+ * @param[in] uh_sport        Source port. 0 by default.
+ * @param[in] uh_dport        Destination port. 0 by default.
+ * @param[in] uh_ulen         Udp length.
+ * @param[in] update_ip6_len  Flag (TRUE by default). If set, NASL will
+ * recompute the size field of the IP datagram.
  *
  * @return tree_cell with the forged UDP packet containing IPv6 header.
  */
@@ -893,15 +971,17 @@ forge_udp_v6_packet (lex_ctxt *lexic)
       return retc;
     }
   else
-    printf ("Error ! You must supply the 'ip6' argument !\n");
+    nasl_perror (lexic, "forge_udp_v6_packet:'ip6' argument missing. \n");
 
   return NULL;
 }
 
 /*
- * @brief Get UDP Header element.
+ * @brief Get an UDP Header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] udp     IPv6 datagram.
+ * @param[in] element One of 'uh_sport', 'uh_dport', 'uh_ulen', 'uh_sum', 'data'
  *
  * @return tree_cell with the forged UDP packet.
  */
@@ -921,8 +1001,9 @@ get_udp_v6_element (lex_ctxt *lexic)
   element = get_str_var_by_name (lexic, "element");
   if (udp == NULL || element == NULL)
     {
-      printf ("get_udp_v6_element() usage :\n");
-      printf ("element = get_udp_v6_element(udp:<udp>,element:<element>\n");
+      nasl_perror (
+        lexic, "get_udp_v6_element() usage :\n"
+               "element = get_udp_v6_element(udp:<udp>,element:<element>\n");
       return NULL;
     }
 
@@ -954,7 +1035,7 @@ get_udp_v6_element (lex_ctxt *lexic)
     }
   else
     {
-      printf ("%s is not a value of a udp packet\n", element);
+      nasl_perror (lexic, "%s is not a value of a udp packet\n", element);
       return NULL;
     }
 
@@ -966,7 +1047,13 @@ get_udp_v6_element (lex_ctxt *lexic)
 /*
  * @brief Set UDP Header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic     Lexical context of NASL interpreter
+ * @param[in] udp       IPv6 packet.
+ * @param[in] data      Data.
+ * @param[in] uh_sport  Source port.
+ * @param[in] uh_dport  Destination port.
+ * @param[in] uh_ulen   Udp length.
+ * @param[in] uh_sum    Checksum.
  *
  * @return tree_cell with the forged UDP packet and IPv6.
  */
@@ -1066,15 +1153,17 @@ set_udp_v6_elements (lex_ctxt *lexic)
       return retc;
     }
   else
-    printf ("Error ! You must supply the 'udp' argument !\n");
+    nasl_perror (lexic,
+                 "set_udp_v6_elements: You must supply the 'udp' argument !\n");
 
   return NULL;
 }
 
 /*
- * @brief Print UDP/IPv6 packet.
+ * @brief Print UDP part of IPv6 packet.
  *
  * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] ...   IPv6 datagrams to dump.
  *
  * @return Print and return FAKE_CELL.
  */
@@ -1115,8 +1204,11 @@ struct v6pseudo_icmp_hdr
 {
   struct in6_addr s6addr;
   struct in6_addr d6addr;
-  char proto;
   unsigned short len;
+  unsigned char zero1;
+  unsigned char zero2;
+  unsigned char zero3;
+  char proto;
   struct icmp6_hdr icmpheader;
 };
 
@@ -1124,6 +1216,18 @@ struct v6pseudo_icmp_hdr
  * @brief Forge ICMPv6 packet.
  *
  * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] ip6               IPv6 datagram to add ICMP header to.
+ * @param[in] data              Payload.
+ * @param[in] icmp_type         0 by default.
+ * @param[in] icmp_code         0 by default.
+ * @param[in] icmp_id           0 by default.
+ * @param[in] icmp_seq
+ * @param[in] reachable_time
+ * @param[in] retransmit_timer
+ * @param[in] flags
+ * @param[in] target
+ * @param[in] update_ip_len
+ * @param[in] icmp_cksum
  *
  * @return tree_cell with the forged ICMPv6 packet containing IPv6 header.
  */
@@ -1216,7 +1320,7 @@ forge_icmp_v6_packet (lex_ctxt *lexic)
             ra->icmp6_code = icmp->icmp6_code;
             ra->icmp6_cksum = icmp->icmp6_cksum;
             routeradvert->nd_ra_reachable =
-              get_int_var_by_name (lexic, "reacheable_time", 0);
+              get_int_var_by_name (lexic, "reachable_time", 0);
             routeradvert->nd_ra_retransmit =
               get_int_var_by_name (lexic, "retransmit_timer", 0);
             routeradvert->nd_ra_curhoplimit = ip6_icmp->ip6_hlim;
@@ -1287,7 +1391,20 @@ forge_icmp_v6_packet (lex_ctxt *lexic)
           break;
         default:
           {
-            nasl_perror (lexic, "forge_icmp_v6_packet: unknown type\n");
+            if (t < 0 || t > 255)
+              {
+                nasl_perror (lexic, "forge_icmp_v6_packet: illegal type %d\n",
+                             t);
+              }
+            else
+              {
+                if (data != NULL)
+                  bcopy (data, &(p[8]), len);
+                icmp->icmp6_id = get_int_var_by_name (lexic, "icmp_id", 0);
+                icmp->icmp6_seq = get_int_var_by_name (lexic, "icmp_seq", 0);
+                size = ip6_sz + 8 + len;
+                sz = 8;
+              }
           }
         }
 
@@ -1362,7 +1479,10 @@ forge_icmp_v6_packet (lex_ctxt *lexic)
 /*
  * @brief Obtain ICMPv6 header element.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] icmp    IPV6 datagram.
+ * @param[in] element One of 'icmp_code', 'icmp_type', 'icmp_cksum', 'icmp_id',
+ * 'icmp_seq', 'data'
  *
  * @return tree_cell with the ICMPv6 header element.
  */
@@ -1381,7 +1501,10 @@ get_icmp_v6_element (lex_ctxt *lexic)
       icmp = (struct icmp6_hdr *) (p + 40);
 
       if (elem == NULL)
-        return NULL;
+        {
+          nasl_perror (lexic, "%s: Missing 'element' argument\n", __func__);
+          return NULL;
+        }
 
       else if (!strcmp (elem, "icmp_code"))
         value = icmp->icmp6_code;
@@ -1407,12 +1530,18 @@ get_icmp_v6_element (lex_ctxt *lexic)
           return retc;
         }
       else
-        return NULL;
+        {
+          nasl_perror (lexic, "%s: '%s' not a valid 'element' argument\n",
+                       __func__, elem);
+          return NULL;
+        }
 
       retc = alloc_typed_cell (CONST_INT);
       retc->x.i_val = value;
       return retc;
     }
+  else
+    nasl_perror (lexic, "%s: missing 'icmp' parameter\n", __func__);
 
   return NULL;
 }
@@ -1434,6 +1563,11 @@ struct igmp6_hdr
  * @brief Forge IGMPv6 packet.
  *
  * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] ip6   IPv6 datagram.
+ * @param[in] data
+ * @param[in] type
+ * @param[in] code
+ * @param[in] group
  *
  * @return tree_cell with the forged IGMPv6 packet containing IPv6 header.
  */
@@ -1488,6 +1622,8 @@ forge_igmp_v6_packet (lex_ctxt *lexic)
       retc->size = 40 + sizeof (struct igmp6_hdr) + len;
       return retc;
     }
+  else
+    nasl_perror (lexic, "forge_igmp_v6_packet: missing 'ip6' parameter\n");
 
   return NULL;
 }
@@ -1496,6 +1632,8 @@ forge_igmp_v6_packet (lex_ctxt *lexic)
  * @brief Performs TCP Connect to test if host is alive.
  *
  * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] port  Port to ping. Internal list of common ports is used as
+ * default.
  *
  * @return tree_cell > 0 if host is alive, 0 otherwise.
  */
@@ -1633,9 +1771,16 @@ nasl_tcp_v6_ping (lex_ctxt *lexic)
 }
 
 /**
- * @brief Send forged IPv6 Packet.
+ * @brief Send forged IPv6 Packets.
  *
- * @param[in] lexic Lexical context of NASL interpreter.
+ * @param[in] lexic           Lexical context of NASL interpreter.
+ * @param[in] ...             IPv6 packets to send.
+ * @param[in] length          Length of each packet by default.
+ * @param[in] pcap_active     TRUE by default. Otherwise, NASL does not listen
+ * for the answers.
+ * @param[in] pcap_filter     BPF filter.
+ * @param[in] pcap_timeout    Capture timeout. 5 by default.
+ * @param[in] allow_multicast Default 0.
  *
  * @return tree_cell with the response to the sent packet.
  */
@@ -1657,8 +1802,9 @@ nasl_send_v6packet (lex_ctxt *lexic)
   int dfl_len = get_int_var_by_name (lexic, "length", -1);
   struct script_infos *script_infos = lexic->script_infos;
   struct in6_addr *dstip = plug_get_host_ip (script_infos);
-  int offset = 1;
+  int opt_on = 1;
   char name[INET6_ADDRSTRLEN];
+  int allow_multicast = 0;
 
   if (dstip == NULL || (IN6_IS_ADDR_V4MAPPED (dstip) == 1))
     return NULL;
@@ -1666,18 +1812,19 @@ nasl_send_v6packet (lex_ctxt *lexic)
   if (soc < 0)
     return NULL;
 
-  if (setsockopt (soc, IPPROTO_IPV6, IP_HDRINCL, (char *) &offset,
-                  sizeof (offset))
+  if (setsockopt (soc, IPPROTO_IPV6, IP_HDRINCL, (char *) &opt_on,
+                  sizeof (opt_on))
       < 0)
     perror ("setsockopt");
   while ((ip = get_str_var_by_num (lexic, vi)) != NULL)
     {
+      allow_multicast = get_int_var_by_name (lexic, "allow_multicast", 0);
       int sz = get_var_size_by_num (lexic, vi);
       vi++;
 
       if ((unsigned int) sz < sizeof (struct ip6_hdr))
         {
-          nasl_perror (lexic, "send_packet(): packet is too short!\n");
+          nasl_perror (lexic, "send_v6packet: packet is too short\n");
           continue;
         }
 
@@ -1688,7 +1835,26 @@ nasl_send_v6packet (lex_ctxt *lexic)
       bzero (&sockaddr, sizeof (struct sockaddr_in6));
       sockaddr.sin6_family = AF_INET6;
       sockaddr.sin6_addr = sip->ip6_dst;
-      if (dstip != NULL && !IN6_ARE_ADDR_EQUAL (&sockaddr.sin6_addr, dstip))
+
+      if (allow_multicast)
+        {
+          struct sockaddr_in6 multicast;
+
+          if (setsockopt (soc, SOL_SOCKET, SO_BROADCAST, &opt_on,
+                          sizeof (opt_on))
+              < 0)
+            perror ("setsockopt ");
+
+          bzero (&multicast, sizeof (struct sockaddr_in6));
+          sockaddr.sin6_family = AF_INET6;
+          inet_pton (AF_INET6, "ff02::1", &(multicast.sin6_addr));
+
+          if (!IN6_ARE_ADDR_EQUAL (&sockaddr.sin6_addr, &multicast.sin6_addr))
+            allow_multicast = 0;
+        }
+
+      if (dstip != NULL && !IN6_ARE_ADDR_EQUAL (&sockaddr.sin6_addr, dstip)
+          && !allow_multicast)
         {
           char txt1[64], txt2[64];
           strncpy (
@@ -1700,7 +1866,7 @@ nasl_send_v6packet (lex_ctxt *lexic)
                    sizeof (txt2));
           txt2[sizeof (txt2) - 1] = '\0';
           nasl_perror (lexic,
-                       "send_packet: malicious or buggy script is trying to "
+                       "send_v6packet: malicious or buggy script is trying to "
                        "send packet to %s instead of designated target %s\n",
                        txt1, txt2);
           if (bpf >= 0)

@@ -1,4 +1,4 @@
-# Copyright (C) 2010-2019 Greenbone Networks GmbH
+# Copyright (C) 2010-2021 Greenbone Networks GmbH
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -26,10 +26,10 @@ if (NOT PKG_CONFIG_FOUND)
 endif (NOT PKG_CONFIG_FOUND)
 
 pkg_check_modules (GLIB REQUIRED glib-2.0>=2.42)
-pkg_check_modules (GNUTLS REQUIRED gnutls>=3.2.15)
+pkg_check_modules (GNUTLS REQUIRED gnutls>=3.6.4)
 
-pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=11.0.0)
-pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=11.0.0)
+pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=20.8)
+pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=20.8)
 
 pkg_check_modules (OPENVAS_WMICLIENT libopenvas_wmiclient>=1.0.5)
 pkg_check_modules (OPENVAS_WINCMD libopenvas_wincmd>=1.0.5)
@@ -94,8 +94,8 @@ set (CMAKE_C_FLAGS              "${CMAKE_C_FLAGS} -Wall -Wextra -fPIC")
 ## Project version
 # The following three variables should be set through the project command once
 # we require CMake >= 3.0
-set (MISC_VERSION_MAJOR 11)
-set (MISC_VERSION_MINOR 0)
+set (MISC_VERSION_MAJOR 20)
+set (MISC_VERSION_MINOR 8)
 set (MISC_VERSION_PATCH 1)
 
 if (PROJECT_BETA_RELEASE)
@@ -105,7 +105,11 @@ else (PROJECT_BETA_RELEASE)
 endif (PROJECT_BETA_RELEASE)
 
 set (MISC_VERSION_STRING "${MISC_VERSION_MAJOR}.${MISC_VERSION_MINOR}${MISC_VERSION_SUFFIX}")
-set (MISC_PACKAGE_VERSION "${MISC_VERSION_STRING}${PROJECT_VERSION_GIT}")
+if (PROJECT_BETA_RELEASE)
+  set (MISC_PACKAGE_VERSION "${MISC_VERSION_STRING}${PROJECT_VERSION_GIT}")
+else (PROJECT_BETA_RELEASE)
+  set (MISC_PACKAGE_VERSION "${MISC_VERSION_STRING}")
+endif (PROJECT_BETA_RELEASE)
 set (MISC_VERSION "${MISC_VERSION_STRING}")
 
 
@@ -157,5 +161,21 @@ install (DIRECTORY
 ## Tests
 
 enable_testing ()
+
+set (ALIVEDETECTION_TEST_LINKER_WRAP_OPTIONS
+     "-Wl,-wrap,socket,-wrap,setsockopt")
+add_executable (pcap-test
+                EXCLUDE_FROM_ALL
+                pcap_tests.c)
+add_test (pcap-test pcap-test)
+target_include_directories (pcap-test PRIVATE ${CGREEN_INCLUDE_DIRS})
+target_link_libraries (pcap-test cgreen
+                       ${LIBGVM_BASE_LDFLAGS}
+                       ${GLIB_LDFLAGS}
+                       ${PCAP_LDFLAGS}
+                       ${LINKER_HARDENING_FLAGS} ${CMAKE_THREAD_LIBS_INIT}
+                       ${ALIVEDETECTION_TEST_LINKER_WRAP_OPTIONS})
+add_custom_target (tests-pcap
+                  DEPENDS pcap-test)
 
 ## End

@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2019 Greenbone Networks GmbH
+# Copyright (C) 2011-2021 Greenbone Networks GmbH
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -21,7 +21,7 @@ cmake_minimum_required (VERSION 3.0)
 message ("-- Configuring the Scanner...")
 
 project (openvas
-  VERSION 7.0.1
+  VERSION 20.8.1
   LANGUAGES C)
 
 if (POLICY CMP0005)
@@ -159,6 +159,11 @@ if (NOT OPENVAS_RUN_DIR)
   set (OPENVAS_RUN_DIR "${LOCALSTATEDIR}/run")
 endif (NOT OPENVAS_RUN_DIR)
 
+if (NOT OPENVAS_FEED_LOCK_PATH)
+  set (OPENVAS_FEED_LOCK_PATH "${OPENVAS_RUN_DIR}/feed-update.lock")
+endif (NOT OPENVAS_FEED_LOCK_PATH)
+add_definitions (-DOPENVAS_FEED_LOCK_PATH="${OPENVAS_FEED_LOCK_PATH}")
+
 set (OPENVAS_DATA_DIR    "${DATADIR}/openvas")
 set (OPENVAS_STATE_DIR   "${LOCALSTATEDIR}/lib/openvas")
 if (NOT GVM_LOG_DIR)
@@ -174,6 +179,10 @@ endif (NOT OPENVAS_NVT_DIR)
 if (NOT GVM_ACCESS_KEY_DIR)
 	set (GVM_ACCESS_KEY_DIR "${GVM_SYSCONF_DIR}")
 endif (NOT GVM_ACCESS_KEY_DIR)
+
+if (NOT OPENVAS_GPG_BASE_DIR)
+	set (OPENVAS_GPG_BASE_DIR "${OPENVAS_SYSCONF_DIR}")
+endif (NOT OPENVAS_GPG_BASE_DIR)
 
 set (OPENVAS_LIB_INSTALL_DIR     "${LIBDIR}")
 
@@ -200,6 +209,9 @@ configure_file (src/openvas_log_conf.cmake_in src/openvas_log.conf)
 ## Testing
 
 enable_testing ()
+
+add_custom_target (tests
+                   DEPENDS attack-test pcap-test)
 
 ## Program
 

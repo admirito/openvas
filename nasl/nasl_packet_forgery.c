@@ -81,11 +81,34 @@ int n;
   sum = (sum >> 16) + (sum & 0xffff); /* add hi 16 to low 16 */
   sum += (sum >> 16);                 /* add carry */
   answer = (int) ~sum;                /* ones-complement, truncate */
-  return answer;
+  return (answer);
 }
 
 /*--------------[ IP ]--------------------------------------------*/
 
+/**
+ * @brief Forge an IP datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] data    Payload.
+ * @param[in] ip_hl   IP header length in 32 bits words. 5 by default.
+ * @param[in] ip_id   Datagram ID. Random by default.
+ * @param[in] ip_len  Length of the datagram. 20 plus the length of the data
+ * field by default.
+ * @param[in] ip_off  Fragment offset in 64 bits words. 0 by default.
+ * @param[in] ip_p    IP protocol. 0 by default.
+ * @param[in] ip_src  Source address in ASCII. NASL will convert it into an
+ * integer in network order.
+ * @param[in] ip_dst  Destination address in ASCII. NASL will convert it into an
+ * integer in network order. Uses the target ip of the current plugin by
+ * default.
+ * @param[in] ip_sum  Packet header checksum. It will be computed by default.
+ * @param[in] ip_tos  Type of service field. 0 by default
+ * @param[in] ip_ttl  Time To Live field. 64 by default.
+ * @param[in] ip_v    IP version. 4 by default.
+ *
+ * @return The forged IP packet.
+ */
 tree_cell *
 forge_ip_packet (lex_ctxt *lexic)
 {
@@ -100,7 +123,11 @@ forge_ip_packet (lex_ctxt *lexic)
   dst_addr = plug_get_host_ip (script_infos);
 
   if (dst_addr == NULL || (IN6_IS_ADDR_V4MAPPED (dst_addr) != 1))
-    return NULL;
+    {
+      nasl_perror (lexic, "forge_ip_packet: No valid dst_addr could be "
+                          "determined via call to plug_get_host_ip().\n");
+      return NULL;
+    }
 
   data = get_str_var_by_name (lexic, "data");
   data_len = get_var_size_by_name (lexic, "data");
@@ -152,6 +179,15 @@ forge_ip_packet (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Extracts a field from an IP datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] element Name of the field, e.g. "ip_len" or "ip_src".
+ * @param[in] ip      IP datagram or fragment.
+ *
+ * @return  integer or a string, depending on the type of the element.
+ */
 tree_cell *
 get_ip_element (lex_ctxt *lexic)
 {
@@ -164,13 +200,13 @@ get_ip_element (lex_ctxt *lexic)
 
   if (ip == NULL)
     {
-      nasl_perror (lexic, "get_ip_element : no valid 'ip' argument!\n");
+      nasl_perror (lexic, "get_ip_element: no valid 'ip' argument\n");
       return NULL;
     }
 
   if (element == NULL)
     {
-      nasl_perror (lexic, "get_ip_element : no valid 'element' argument!\n");
+      nasl_perror (lexic, "get_ip_element: no valid 'element' argument\n");
       return NULL;
     }
 
@@ -240,7 +276,7 @@ get_ip_element (lex_ctxt *lexic)
 
   if (flag == 0)
     {
-      printf ("%s : unknown element\n", element);
+      nasl_perror (lexic, "%s: unknown element '%s'\n", __func__, element);
       return NULL;
     }
 
@@ -251,6 +287,26 @@ get_ip_element (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Modify the fields of a datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ip      IP datagram to set fields on.
+ * @param[in] ip_hl   IP header length in 32 bits words. 5 by default.
+ * @param[in] ip_id   Datagram ID. Random by default.
+ * @param[in] ip_len  Length of the datagram. 20 plus the length of the data
+ * field by default.
+ * @param[in] ip_off  Fragment offset in 64 bits words. 0 by default.
+ * @param[in] ip_p    IP protocol. 0 by default.
+ * @param[in] ip_src  Source address in ASCII. NASL will convert it into an
+ * integer in network order.
+ * @param[in] ip_sum  Packet header checksum. It will be computed by default.
+ * @param[in] ip_tos  Type of service field. 0 by default
+ * @param[in] ip_ttl  Time To Live field. 64 by default.
+ * @param[in] ip_v    IP version. 4 by default.
+ *
+ * @return The modified IP datagram.
+ */
 tree_cell *
 set_ip_elements (lex_ctxt *lexic)
 {
@@ -295,6 +351,17 @@ set_ip_elements (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Add option datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ip      IP datagram to add the option to.
+ * @param[in] code    Number of the option.
+ * @param[in] length  Length of the option data.
+ * @param[in] value   Option data.
+ *
+ * @return The modified IP datagram.
+ */
 tree_cell *
 insert_ip_options (lex_ctxt *lexic)
 {
@@ -366,6 +433,12 @@ insert_ip_options (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Dump IP datagrams.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ...     IP datagrams to dump.
+ */
 tree_cell *
 dump_ip_packet (lex_ctxt *lexic)
 {
@@ -379,31 +452,31 @@ dump_ip_packet (lex_ctxt *lexic)
       else
         {
           printf ("------\n");
-          printf ("\tip_hl : %d\n", ip->ip_hl);
-          printf ("\tip_v  : %d\n", ip->ip_v);
-          printf ("\tip_tos: %d\n", ip->ip_tos);
-          printf ("\tip_len: %d\n", UNFIX (ip->ip_len));
-          printf ("\tip_id : %d\n", ntohs (ip->ip_id));
-          printf ("\tip_off: %d\n", UNFIX (ip->ip_off));
-          printf ("\tip_ttl: %d\n", ip->ip_ttl);
+          printf ("\tip_hl  : %d\n", ip->ip_hl);
+          printf ("\tip_v   : %d\n", ip->ip_v);
+          printf ("\tip_tos : %d\n", ip->ip_tos);
+          printf ("\tip_len : %d\n", UNFIX (ip->ip_len));
+          printf ("\tip_id  : %d\n", ntohs (ip->ip_id));
+          printf ("\tip_off : %d\n", UNFIX (ip->ip_off));
+          printf ("\tip_ttl : %d\n", ip->ip_ttl);
           switch (ip->ip_p)
             {
             case IPPROTO_TCP:
-              printf ("\tip_p  : IPPROTO_TCP (%d)\n", ip->ip_p);
+              printf ("\tip_p   : IPPROTO_TCP (%d)\n", ip->ip_p);
               break;
             case IPPROTO_UDP:
-              printf ("\tip_p  : IPPROTO_UDP (%d)\n", ip->ip_p);
+              printf ("\tip_p   : IPPROTO_UDP (%d)\n", ip->ip_p);
               break;
             case IPPROTO_ICMP:
-              printf ("\tip_p  : IPPROTO_ICMP (%d)\n", ip->ip_p);
+              printf ("\tip_p   : IPPROTO_ICMP (%d)\n", ip->ip_p);
               break;
             default:
-              printf ("\tip_p  : %d\n", ip->ip_p);
+              printf ("\tip_p   : %d\n", ip->ip_p);
               break;
             }
-          printf ("\tip_sum: 0x%x\n", ntohs (ip->ip_sum));
-          printf ("\tip_src: %s\n", inet_ntoa (ip->ip_src));
-          printf ("\tip_dst: %s\n", inet_ntoa (ip->ip_dst));
+          printf ("\tip_sum : 0x%x\n", ntohs (ip->ip_sum));
+          printf ("\tip_src : %s\n", inet_ntoa (ip->ip_src));
+          printf ("\tip_dst : %s\n", inet_ntoa (ip->ip_dst));
           printf ("\n");
         }
     }
@@ -423,6 +496,33 @@ struct pseudohdr
   struct tcphdr tcpheader;
 };
 
+/**
+ * @brief Fills an IP datagram with TCP data. Note that the ip_p field is not
+ updated. It returns the modified IP datagram. Its arguments are:
+
+ * @param[in] ip        IP datagram to be filled.
+ * @param[in] data      TCP data payload.
+ * @param[in] th_ack    Acknowledge number. NASL will convert it into network
+ order if necessary. 0 by default.
+ * @param[in] th_dport  Destination port. NASL will convert it into network
+ order if necessary. 0 by default.
+ * @param[in] th_flags  TCP flags. 0 by default.
+ * @param[in] th_off    Size of the TCP header in 32 bits words. By default, 5.
+ * @param[in] th_seq    TCP sequence number. NASL will convert it into network
+ order if necessary. Random by default.
+ * @param[in] th_sport  Source port. NASL will convert it into network order if
+ necessary. 0 by default.
+ * @param[in] th_sum    TCP checksum. Right value is computed by default.
+ * @param[in] th_urp    Urgent pointer. 0 by default.
+ * @param[in] th_win    TCP window size. NASL will convert it into network order
+ if necessary. 0 by default.
+ * @param[in] th_x2           Is a reserved field and should probably be left
+ unchanged. 0 by default.
+ * @param[in] update_ip_len   Flag (TRUE by default). If set, NASL will
+ recompute the size field of the IP datagram.
+ *
+ * @return Modified IP datagram.
+ */
 tree_cell *
 forge_tcp_packet (lex_ctxt *lexic)
 {
@@ -437,7 +537,7 @@ forge_tcp_packet (lex_ctxt *lexic)
   if (ip == NULL)
     {
       nasl_perror (lexic,
-                   "forge_tcp_packet : You must supply the 'ip' argument !");
+                   "forge_tcp_packet: You must supply the 'ip' argument\n");
       return NULL;
     }
 
@@ -511,6 +611,15 @@ forge_tcp_packet (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Extracts TCP field from an IP datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] element Name of the the TCP field. See forge_tcp_packet().
+ * @param[in] tcp     The full IP datagram (IP + TCP).
+ *
+ * @return  Data block or an integer, according to the type of the element.
+ */
 tree_cell *
 get_tcp_element (lex_ctxt *lexic)
 {
@@ -526,8 +635,7 @@ get_tcp_element (lex_ctxt *lexic)
 
   if (packet == NULL)
     {
-      nasl_perror (lexic,
-                   "get_tcp_element : Error ! No valid 'tcp' argument !\n");
+      nasl_perror (lexic, "get_tcp_element: No valid 'tcp' argument\n");
       return NULL;
     }
 
@@ -544,8 +652,7 @@ get_tcp_element (lex_ctxt *lexic)
   element = get_str_var_by_name (lexic, "element");
   if (!element)
     {
-      nasl_perror (lexic,
-                   "get_tcp_element : Error ! No valid 'element' argument !\n");
+      nasl_perror (lexic, "get_tcp_element: No valid 'element' argument\n");
       return NULL;
     }
 
@@ -572,14 +679,14 @@ get_tcp_element (lex_ctxt *lexic)
   else if (!strcmp (element, "data"))
     {
       retc = alloc_typed_cell (CONST_DATA);
-      retc->size = UNFIX (ip->ip_len) - ntohl (tcp->th_off) * 4;
+      retc->size = UNFIX (ip->ip_len) - (tcp->th_off + ip->ip_hl) * 4;
       retc->x.str_val = g_malloc0 (retc->size);
-      bcopy (tcp + ntohl (tcp->th_off) * 4, retc->x.str_val, retc->size);
+      bcopy ((char *) tcp + tcp->th_off * 4, retc->x.str_val, retc->size);
       return retc;
     }
   else
     {
-      nasl_perror (lexic, "Unknown tcp field %s\n", element);
+      nasl_perror (lexic, "get_tcp_element: Unknown tcp field %s\n", element);
       return NULL;
     }
 
@@ -588,6 +695,33 @@ get_tcp_element (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Modify the TCP fields of a datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] tcp       IP datagram.
+ * @param[in] data      TCP data payload.
+ * @param[in] th_ack    Acknowledge number. NASL will convert it into network
+ * order if necessary.
+ * @param[in] th_dport  Destination port. NASL will convert it into network
+ * order if necessary.
+ * @param[in] th_flags  TCP flags.
+ * @param[in] th_off    Size of the TCP header in 32 bits words.
+ * @param[in] th_seq    TCP sequence number. NASL will convert it into network
+ * order if necessary.
+ * @param[in] th_sport  Source port. NASL will convert it into network order
+ * if necessary.
+ * @param[in] th_sum    TCP checksum.
+ * @param[in] th_urp    Urgent pointer.
+ * @param[in] th_win    TCP window size. NASL will convert it into network
+ * order if necessary.
+ * @param[in] th_x2           Is a reserved field and should probably be left
+ * unchanged.
+ * @param[in] update_ip_len   Flag (TRUE by default). If set, NASL will
+ * recompute the size field of the IP datagram.
+ *
+ * @return The modified IP datagram.
+ */
 tree_cell *
 set_tcp_elements (lex_ctxt *lexic)
 {
@@ -603,7 +737,7 @@ set_tcp_elements (lex_ctxt *lexic)
   if (!ip)
     {
       nasl_perror (lexic,
-                   "set_tcp_elements : Invalid value for the argument 'tcp'\n");
+                   "set_tcp_elements: Invalid value for the argument 'tcp'\n");
       return NULL;
     }
 
@@ -684,6 +818,12 @@ set_tcp_elements (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Dump the TCP part of a IP Datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ...     IP datagrams to dump the TCP part from.
+ */
 tree_cell *
 dump_tcp_packet (lex_ctxt *lexic)
 {
@@ -752,8 +892,8 @@ dump_tcp_packet (lex_ctxt *lexic)
         printf (" (%d)", tcp->th_flags);
       printf ("\n");
       printf ("\tth_win   : %d\n", ntohs (tcp->th_win));
-      printf ("\tth_sum   : 0x%x\n", tcp->th_sum);
-      printf ("\tth_urp   : %d\n", tcp->th_urp);
+      printf ("\tth_sum   : 0x%x\n", ntohs (tcp->th_sum));
+      printf ("\tth_urp   : %d\n", ntohs (tcp->th_urp));
       printf ("\tData     : ");
       c = (char *) ((char *) tcp + sizeof (struct tcphdr));
       if (UNFIX (ip->ip_len) > (sizeof (struct ip) + sizeof (struct tcphdr)))
@@ -780,6 +920,25 @@ struct pseudo_udp_hdr
   struct udphdr udpheader;
 };
 
+/**
+ * @brief Fills an IP datagram with UDP data. Note that the ip_p field is not
+ updated. It returns the modified IP datagram. Its arguments are:
+
+ * @param[in] ip            IP datagram to be filled.
+ * @param[in] data          Payload.
+ * @param[in] uh_dport      Destination port. NASL will convert it into network
+ order if necessary. 0 by default.
+ * @param[in] uh_sport      Source port. NASL will convert it into network order
+ if necessary. 0 by default.
+ * @param[in] uh_sum        UDP checksum. Although it is not compulsory, the
+ right value is computed by default.
+ * @param[in] uh_ulen       Data length. By default it is set to the length of
+ the data argument plus the size of the UDP header.
+ * @param[in] update_ip_len Flag (TRUE by default). If set, NASL will recompute
+ the size field of the IP datagram.
+ *
+ * @return Modified IP datagram.
+ */
 tree_cell *
 forge_udp_packet (lex_ctxt *lexic)
 {
@@ -858,11 +1017,21 @@ forge_udp_packet (lex_ctxt *lexic)
       return retc;
     }
   else
-    printf ("Error ! You must supply the 'ip' argument !\n");
+    nasl_perror (lexic,
+                 "forge_udp_packet: Invalid value for the argument 'ip'\n");
 
   return NULL;
 }
 
+/**
+ * @brief Get an UDP element from a IP datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] udp     The full IP datagram (IP + UDP).
+ * @param[in] element Name of the UDP field (see forge_udp_packet()).
+ *
+ * @return  Data block or an integer, according to the type of the element.
+ */
 tree_cell *
 get_udp_element (lex_ctxt *lexic)
 {
@@ -880,8 +1049,8 @@ get_udp_element (lex_ctxt *lexic)
   element = get_str_var_by_name (lexic, "element");
   if (udp == NULL || element == NULL)
     {
-      printf ("get_udp_element() usage :\n");
-      printf ("element = get_udp_element(udp:<udp>,element:<element>\n");
+      nasl_perror (lexic, "get_udp_element: usage :\nelement = "
+                          "get_udp_element(udp:<udp>,element:<element>\n");
       return NULL;
     }
   ip = (struct ip *) udp;
@@ -915,7 +1084,8 @@ get_udp_element (lex_ctxt *lexic)
     }
   else
     {
-      printf ("%s is not a value of a udp packet\n", element);
+      nasl_perror (lexic, "%s: '%s' is not a value of a udp packet\n", __func__,
+                   element);
       return NULL;
     }
 
@@ -924,6 +1094,20 @@ get_udp_element (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Modify UDP fields of an IP datagram.
+ *
+ * @param[in] udp   IP datagram to modify.
+ * @param[in] data          Payload.
+ * @param[in] uh_dport      Destination port. NASL will convert it into network
+ * order if necessary.
+ * @param[in] uh_sport      Source port. NASL will convert it into network order
+ * if necessary.
+ * @param[in] uh_sum        UDP checksum.
+ * @param[in] uh_ulen       Data length.
+ *
+ * @return Modified IP datagram.
+ */
 tree_cell *
 set_udp_elements (lex_ctxt *lexic)
 {
@@ -1024,11 +1208,18 @@ set_udp_elements (lex_ctxt *lexic)
       return retc;
     }
   else
-    printf ("Error ! You must supply the 'udp' argument !\n");
+    nasl_perror (lexic,
+                 "set_udp_elements:  Invalid value for the argument 'udp'.");
 
   return NULL;
 }
 
+/**
+ * @brief Dump the UDP part of a IP Datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] ...     IP datagrams to dump the UDP part from.
+ */
 tree_cell *
 dump_udp_packet (lex_ctxt *lexic)
 {
@@ -1059,6 +1250,22 @@ dump_udp_packet (lex_ctxt *lexic)
 
 /*--------------[  ICMP  ]--------------------------------------------*/
 
+/**
+ * @brief Fill an IP datagram with ICMP data.
+ *
+ * @param[in] lexic         Lexical context of NASL interpreter.
+ * @param[in] ip            IP datagram that is updated.
+ * @param[in] data          Payload.
+ * @param[in] icmp_cksum    Checksum, computed by default.
+ * @param[in] icmp_code     ICMP code. 0 by default.
+ * @param[in] icmp_id       ICMP ID. 0 by default.
+ * @param[in] icmp_seq      ICMP sequence number.
+ * @param[in] icmp_type     ICMP type. 0 by default.
+ * @param[in] update_ip_len Flag (TRUE by default). If set, NASL will recompute
+ * the size field of the IP datagram.
+ *
+ * @return Modified IP datagram.
+ */
 tree_cell *
 forge_icmp_packet (lex_ctxt *lexic)
 {
@@ -1126,6 +1333,15 @@ forge_icmp_packet (lex_ctxt *lexic)
   return retc;
 }
 
+/**
+ * @brief Get an ICMP element from a IP datagram.
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] icmp    Full IP datagram (IP + ICMP).
+ * @param[in] element Name of the TCP field (see forge_tcp_packet()).
+ *
+ * @return Data block or an integer, according to the type of the element.
+ */
 tree_cell *
 get_icmp_element (lex_ctxt *lexic)
 {
@@ -1142,7 +1358,11 @@ get_icmp_element (lex_ctxt *lexic)
       icmp = (struct icmp *) (p + ip->ip_hl * 4);
 
       if (elem == NULL)
-        return NULL;
+        {
+          nasl_perror (lexic,
+                       "get_icmp_element: missing 'element' parameter\n");
+          return NULL;
+        }
 
       if (!strcmp (elem, "icmp_id"))
         value = ntohs (icmp->icmp_id);
@@ -1170,12 +1390,20 @@ get_icmp_element (lex_ctxt *lexic)
           return retc;
         }
       else
-        return NULL;
+        {
+          nasl_perror (
+            lexic,
+            "get_icmp_element: Element '%s' is not a valid element to get.\n",
+            elem);
+          return NULL;
+        }
 
       retc = alloc_typed_cell (CONST_INT);
       retc->x.i_val = value;
       return retc;
     }
+  else
+    nasl_perror (lexic, "get_icmp_element: missing 'icmp' parameter\n");
 
   return NULL;
 }
@@ -1190,6 +1418,20 @@ struct igmp
   struct in_addr group;
 };
 
+/**
+ * @brief Fills an IP datagram with IGMP data.
+ *
+ * @param[in] lexic         Lexical context of NASL interpreter.
+ * @param[in] ip            IP datagram that is updated.
+ * @param[in] code          0 by default.
+ * @param[in] data
+ * @param[in] group
+ * @param[in] type          0 by default.
+ * @param[in] update_ip_len Flag (TRUE by default). If set, NASL will recompute
+ * the size field of the IP datagram.
+ *
+ * @return Modified IP datagram.
+ */
 tree_cell *
 forge_igmp_packet (lex_ctxt *lexic)
 {
@@ -1244,12 +1486,26 @@ forge_igmp_packet (lex_ctxt *lexic)
       retc->size = ip->ip_hl * 4 + sizeof (struct igmp) + len;
       return retc;
     }
+  else
+    nasl_perror (lexic, "forge_igmp_packet: missing 'ip' parameter\n");
 
   return NULL;
 }
 
 /*---------------------------------------------------------------------------*/
 
+/**
+ * @brief Lunches a “TCP ping” against the target host.
+ *
+ * Tries to open a TCP connection and sees if anything comes back (SYN/ACK or
+ * RST).
+ *
+ * @param[in] lexic   Lexical context of NASL interpreter.
+ * @param[in] port    Port to ping. Internal list of common ports is used as
+ * default.
+ *
+ * @return 1 if Ping was successful, 0 else.
+ */
 tree_cell *
 nasl_tcp_ping (lex_ctxt *lexic)
 {
@@ -1389,6 +1645,21 @@ nasl_tcp_ping (lex_ctxt *lexic)
 
 /*---------------------------------------------------------------------------*/
 
+/**
+ * @brief Send a list of packets (passed as unnamed arguments) and listens to
+ * the answers. It returns a block made of all the sniffed “answers”.
+ *
+ * @param[in] lexic           Lexical context of NASL interpreter.
+ * @param[in] ...             Packets to send.
+ * @param[in] length          Length of each packet by default.
+ * @param[in] pcap_active     TRUE by default. Otherwise, NASL does not listen
+ * for the answers.
+ * @param[in] pcap_filter     BPF filter.
+ * @param[in] pcap_timeout    Capture timeout. 5 by default.
+ * @param[in] allow_broadcast Default 0.
+ *
+ * @return block made of all the sniffed “answers”.
+ */
 tree_cell *
 nasl_send_packet (lex_ctxt *lexic)
 {
@@ -1405,10 +1676,11 @@ nasl_send_packet (lex_ctxt *lexic)
   int to = get_int_var_by_name (lexic, "pcap_timeout", 5);
   char *filter = get_str_var_by_name (lexic, "pcap_filter");
   int dfl_len = get_int_var_by_name (lexic, "length", -1);
-  int i = 1;
+  int opt_on = 1;
   struct script_infos *script_infos = lexic->script_infos;
   struct in6_addr *dstip = plug_get_host_ip (script_infos);
   struct in_addr inaddr;
+  int allow_broadcast = 0;
 
   if (dstip == NULL || (IN6_IS_ADDR_V4MAPPED (dstip) != 1))
     return NULL;
@@ -1416,17 +1688,20 @@ nasl_send_packet (lex_ctxt *lexic)
   soc = socket (AF_INET, SOCK_RAW, IPPROTO_RAW);
   if (soc < 0)
     return NULL;
-  if (setsockopt (soc, IPPROTO_IP, IP_HDRINCL, (char *) &i, sizeof (i)) < 0)
+  if (setsockopt (soc, IPPROTO_IP, IP_HDRINCL, (char *) &opt_on,
+                  sizeof (opt_on))
+      < 0)
     perror ("setsockopt ");
 
   while ((ip = get_str_var_by_num (lexic, vi)) != NULL)
     {
+      allow_broadcast = get_int_var_by_name (lexic, "allow_broadcast", 0);
       int sz = get_var_size_by_num (lexic, vi);
       vi++;
 
       if ((unsigned int) sz < sizeof (struct ip))
         {
-          nasl_perror (lexic, "send_packet(): packet is too short!\n");
+          nasl_perror (lexic, "send_packet: packet is too short\n");
           continue;
         }
 
@@ -1437,7 +1712,18 @@ nasl_send_packet (lex_ctxt *lexic)
       bzero (&sockaddr, sizeof (struct sockaddr_in));
       sockaddr.sin_family = AF_INET;
       sockaddr.sin_addr = sip->ip_dst;
-      if (sockaddr.sin_addr.s_addr != inaddr.s_addr)
+
+      if (allow_broadcast)
+        {
+          if (setsockopt (soc, SOL_SOCKET, SO_BROADCAST, &opt_on,
+                          sizeof (opt_on))
+              < 0)
+            perror ("setsockopt ");
+          if (sockaddr.sin_addr.s_addr != INADDR_BROADCAST)
+            allow_broadcast = 0;
+        }
+
+      if (sockaddr.sin_addr.s_addr != inaddr.s_addr && !allow_broadcast)
         {
           char txt1[64], txt2[64];
           strncpy (txt1, inet_ntoa (sockaddr.sin_addr), sizeof (txt1));
@@ -1499,6 +1785,17 @@ nasl_send_packet (lex_ctxt *lexic)
 
 /*---------------------------------------------------------------------------*/
 
+/**
+ * @brief Listen to one packet and return it.
+ *
+ * @param[in] lexic         Lexical context of NASL interpreter.
+ * @param[in] interface     Network interface name. By default, NASL will try to
+ * find the best one.
+ * @param[in] pcap_filter   BPF filter. By default, it listens to everything.
+ * @param[in] timeout       5 seconds by default.
+ *
+ * @return Packet which was captured.
+ */
 tree_cell *
 nasl_pcap_next (lex_ctxt *lexic)
 {
@@ -1509,6 +1806,7 @@ nasl_pcap_next (lex_ctxt *lexic)
   struct ip *ret = NULL;
   struct ip6_hdr *ret6 = NULL;
   char *filter = get_str_var_by_name (lexic, "pcap_filter");
+  pcap_if_t *alldevsp = NULL; /* list of capture devices */
   int timeout = get_int_var_by_name (lexic, "timeout", 5);
   tree_cell *retc;
   int sz;
@@ -1536,13 +1834,19 @@ nasl_pcap_next (lex_ctxt *lexic)
           interface = v6_routethrough (dst, &src);
         }
       if (interface == NULL)
-        interface = pcap_lookupdev (errbuf);
+        {
+          if (pcap_findalldevs (&alldevsp, errbuf) < 0)
+            g_message ("Error for pcap_findalldevs(): %s", errbuf);
+          if (alldevsp != NULL)
+            interface = alldevsp->name;
+        }
     }
 
   if (interface != NULL)
     {
       bpf = bpf_open_live (interface, filter);
     }
+
   if (bpf < 0)
     {
       nasl_perror (lexic, "pcap_next: Could not get a bpf\n");
@@ -1627,9 +1931,21 @@ nasl_pcap_next (lex_ctxt *lexic)
     retc->x.str_val = (char *) ret6;
   retc->size = sz;
 
+  if (alldevsp != NULL)
+    pcap_freealldevs (alldevsp);
+
   return retc;
 }
 
+/**
+ * @brief Send a capture.
+ *
+ * @param[in] interface string
+ * @param[in] pcap filter string
+ * @param[in] timeout integer
+ *
+ * @return Packet which was captured.
+ */
 tree_cell *
 nasl_send_capture (lex_ctxt *lexic)
 {
@@ -1640,6 +1956,7 @@ nasl_send_capture (lex_ctxt *lexic)
   struct ip *ret = NULL;
   struct ip6_hdr *ret6 = NULL;
   char *filter = get_str_var_by_name (lexic, "pcap_filter");
+  pcap_if_t *alldevsp = NULL; /* list of capture devices */
   int timeout = get_int_var_by_name (lexic, "timeout", 5);
   tree_cell *retc;
   int sz;
@@ -1666,7 +1983,12 @@ nasl_send_capture (lex_ctxt *lexic)
           interface = v6_routethrough (dst, &src);
         }
       if (interface == NULL)
-        interface = pcap_lookupdev (errbuf);
+        {
+          if (pcap_findalldevs (&alldevsp, errbuf) < 0)
+            g_message ("Error for pcap_findalldevs(): %s", errbuf);
+          if (alldevsp != NULL)
+            interface = alldevsp->name;
+        }
     }
 
   if (interface != NULL)
@@ -1754,6 +2076,9 @@ nasl_send_capture (lex_ctxt *lexic)
   else
     retc->x.str_val = (char *) ret6;
   retc->size = sz;
+
+  if (alldevsp != NULL)
+    pcap_freealldevs (alldevsp);
 
   return retc;
 }

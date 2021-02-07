@@ -1,4 +1,4 @@
-/* Copyright (C) 2012-2019 Greenbone Networks GmbH
+/* Copyright (C) 2012-2021 Greenbone Networks GmbH
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -222,7 +222,7 @@ nasl_cert_open (lex_ctxt *lexic)
   obj = g_try_malloc (sizeof *obj);
   if (!obj)
     {
-      g_message ("malloc failed in %s", __FUNCTION__);
+      g_message ("malloc failed in %s", __func__);
       ksba_cert_release (cert);
       return NULL;
     }
@@ -433,7 +433,7 @@ failure:
 }
 
 /* Given a CERT object, build an array with all hostnames identified
-   by the certifciate.  */
+   by the certificate.  */
 static tree_cell *
 build_hostname_list (ksba_cert_t cert)
 {

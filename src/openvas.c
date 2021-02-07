@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -115,7 +115,6 @@ static openvas_option openvas_defaults[] = {
   {"log_whole_attack", "no"},
   {"log_plugins_name_at_load", "no"},
   {"optimize_test", "yes"},
-  {"network_scan", "no"},
   {"non_simult_ports", "139, 445, 3389, Services/irc"},
   {"plugins_timeout", G_STRINGIFY (NVT_TIMEOUT)},
   {"scanner_plugins_timeout", G_STRINGIFY (SCANNER_NVT_TIMEOUT)},
@@ -127,6 +126,7 @@ static openvas_option openvas_defaults[] = {
   {"report_host_details", "yes"},
   {"db_address", KB_PATH_DEFAULT},
   {"vendor_version", "\0"},
+  {"test_alive_hosts_only", "no"},
   {NULL, NULL}};
 
 static void
@@ -169,7 +169,7 @@ handle_termination_signal (int sig)
  * @brief Initializes main scanner process' signal handlers.
  */
 static void
-init_signal_handlers ()
+init_signal_handlers (void)
 {
   openvas_signal (SIGTERM, handle_termination_signal);
   openvas_signal (SIGINT, handle_termination_signal);
@@ -180,7 +180,7 @@ init_signal_handlers ()
 
 /* Restarts the scanner by reloading the configuration. */
 static void
-reload_openvas ()
+reload_openvas (void)
 {
   static gchar *rc_name = NULL;
   const char *config_file;
@@ -262,6 +262,10 @@ load_scan_preferences (struct scan_globals *globals)
 
               g_free (file_hash);
             }
+          else if (is_scanner_only_pref (pref[0]))
+            g_warning ("%s is a scanner only preference. It can not be written "
+                       "by the client and will be ignored.",
+                       pref_name[0]);
           else
             prefs_set (pref[0], pref[1] ?: "");
           g_strfreev (pref_name);
@@ -270,9 +274,11 @@ load_scan_preferences (struct scan_globals *globals)
       g_strfreev (pref);
       res = res->next;
     }
+  kb_del_items (kb, key);
   snprintf (key, sizeof (key), "internal/%s", globals->scan_id);
   kb_item_set_str (kb, key, "ready", 0);
   kb_item_set_int (kb, "internal/ovas_pid", getpid ());
+  kb_lnk_reset (kb);
 
   g_debug ("End loading scan preferences.");
 
@@ -281,9 +287,14 @@ load_scan_preferences (struct scan_globals *globals)
 }
 
 static void
-handle_client (struct scan_globals *globals)
+scanner_thread (struct scan_globals *globals)
 {
-  kb_t net_kb = NULL;
+  /* Make process a group leader, to make it easier to cleanup forked
+   * processes & their children. */
+  setpgid (0, 0);
+  nvticache_reset ();
+
+  globals->scan_id = g_strdup (global_scan_id);
 
   /* Load preferences from Redis. Scan started with a scan_id. */
   if (load_scan_preferences (globals))
@@ -292,22 +303,7 @@ handle_client (struct scan_globals *globals)
       exit (0);
     }
 
-  attack_network (globals, &net_kb);
-  if (net_kb != NULL)
-    {
-      kb_delete (net_kb);
-      net_kb = NULL;
-    }
-}
-
-static void
-scanner_thread (struct scan_globals *globals)
-{
-  nvticache_reset ();
-
-  globals->scan_id = g_strdup (global_scan_id);
-
-  handle_client (globals);
+  attack_network (globals);
 
   exit (0);
 }
@@ -339,7 +335,7 @@ init_openvas (const char *config_file)
 }
 
 static int
-flush_all_kbs ()
+flush_all_kbs (void)
 {
   kb_t kb;
   int rc;
@@ -353,7 +349,7 @@ flush_all_kbs ()
 }
 
 static void
-gcrypt_init ()
+gcrypt_init (void)
 {
   if (gcry_control (GCRYCTL_ANY_INITIALIZATION_P))
     return;
@@ -365,7 +361,7 @@ gcrypt_init ()
 }
 
 void
-start_single_task_scan ()
+start_single_task_scan (void)
 {
   struct scan_globals *globals;
 
@@ -395,12 +391,12 @@ start_single_task_scan ()
 }
 /**
  * @brief Search in redis the process ID of a running scan and
- * sends it the kill signal SIGUSR2, which will stop the scan.
+ * sends it the kill signal SIGUSR1, which will stop the scan.
  * To find the process ID, it uses the scan_id passed with the
  * --scan-stop option.
  */
 static void
-stop_single_task_scan ()
+stop_single_task_scan (void)
 {
   char key[1024];
   kb_t kb;
@@ -415,7 +411,16 @@ stop_single_task_scan ()
     exit (1);
 
   pid = kb_item_get_int (kb, "internal/ovas_pid");
-  kill (pid, SIGUSR1);
+
+  /* Only send the signal if the pid is a positive value.
+     Since kb_item_get_int() will return -1 if the key does
+     not exist. killing with -1 pid will send the signal system wide.
+   */
+  if (pid <= 0)
+    return;
+
+  /* Send the signal to the process group. */
+  killpg (pid, SIGUSR1);
 
   exit (0);
 }
@@ -487,7 +492,7 @@ openvas (int argc, char *argv[])
       printf ("GIT revision %s\n", OPENVAS_GIT_REVISION);
 #endif
       printf ("gvm-libs %s\n", gvm_libs_version ());
-      printf ("Most new code since 2005: (C) 2019 Greenbone Networks GmbH\n");
+      printf ("Most new code since 2005: (C) 2021 Greenbone Networks GmbH\n");
       printf (
         "Nessus origin: (C) 2004 Renaud Deraison <deraison@nessus.org>\n");
       printf ("License GPLv2: GNU GPL version 2\n");

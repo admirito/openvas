@@ -4,20 +4,107 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [7.0.1] (2020-05-12)
+## [20.08.1] (2021.02.01)
+
+### Added
+- Extend nasl lint to detect if function parameter is used twice. [#590](https://github.com/greenbone/openvas/pull/590)
+- Add support for TLSv1.3. [#588](https://github.com/greenbone/openvas/pull/588)[#598](https://github.com/greenbone/openvas/pull/598)
+- Add alternative for supporting snmp during scans. [#594](https://github.com/greenbone/openvas/pull/594)
+- Add resolve_hostname_to_multiple_ips() NASL function. [#596](https://github.com/greenbone/openvas/pull/596)
+- Send message to the client with hosts count. [#606](https://github.com/greenbone/openvas/pull/606)
+- Use nasl_perror on invalid input and add more documentation. [#608](https://github.com/greenbone/openvas/pull/608)
+- Add timeout argument to ssh_connect() nasl function to set the connection timeout. [631](https://github.com/greenbone/openvas/pull/631)
+
+### Changed
+- Downgrade wmi queries log level for common errors.
+  [#602](https://github.com/greenbone/openvas/pull/602)
+  [#607](https://github.com/greenbone/openvas/pull/607)
+- Rename some nasl functions and func parameters for consistency and fix byte order issue in get_ipv6_element. [#613](https://github.com/greenbone/openvas/pull/613)
+- Change log level from debug to message to show max_host and max_scan during scan start. [#626](https://github.com/greenbone/openvas/pull/626)
+
+### Fixed
+- Fork vhosts before creating the socket.[#576](https://github.com/greenbone/openvas/pull/576)
+- Check if another forked child has already added the same vhost. [#581](https://github.com/greenbone/openvas/pull/581)
+- Send duplicated hosts as dead hosts to ospd, to adjust scan progress calculation. [#586](https://github.com/greenbone/openvas/pull/586)
+- Only send the signal if the pid is a positive value. [#593](https://github.com/greenbone/openvas/pull/593)
+- When routes with same mask are found the route with the better metric is chosen.
+  [#593](https://github.com/greenbone/openvas/pull/593)
+  [#639](https://github.com/greenbone/openvas/pull/639)
+- Fix malformed target. [#625](https://github.com/greenbone/openvas/pull/625)
+- Fix snmp result. Only return the value and do not stop at the first \n. [#627](https://github.com/greenbone/openvas/pull/627)
+- Fix masking of IPv6 addresses. [#635](https://github.com/greenbone/openvas/pull/635)
+- Fix technique switch for getting the appropriate interface to use for IPv6 dst addr. [#636](https://github.com/greenbone/openvas/pull/636)
+- Fix host count. Set to -1 when the target string is invalid. [#646](https://github.com/greenbone/openvas/pull/646)
+
+[20.08.1]: https://github.com/greenbone/openvas/compare/v20.8.0...v20.8.1
+
+## [20.08] (2020-08-11)
+
+### Added
+- Create greenbone-nvt-sync create lock file during feed sync.
+  [#458](https://github.com/greenbone/openvas/pull/458)
+  [#459](https://github.com/greenbone/openvas/pull/459)
+- Extend script_get_preference() to get the value by id. [#470](https://github.com/greenbone/openvas/pull/470)
+- Add extended environmental variables info to greenbone-nvt-sync help text. [#488](https://github.com/greenbone/openvas/pull/488)
+- Extend nasl functions which generate results with optional "uri" parameter [#526](https://github.com/greenbone/openvas/pull/526)
+- Add nasl function to get the host kb index. [#530](https://github.com/greenbone/openvas/pull/530)
+- Print the filter used by pcap in the error message.
+  [#537](https://github.com/greenbone/openvas/pull/537)
+  [#540](https://github.com/greenbone/openvas/pull/540)
+
+### Changed
+- The logging of the NASL internal regexp functions was extended to include the pattern in case of a failed regcomp(). [#397](https://github.com/greenbone/openvas/pull/397)
+- Add config for gpg keyring path (OPENVAS_GPG_BASE_DIR) [#407](https://github.com/greenbone/openvas/pull/407)
+- Use __func__ instead of __FUNCTION__ [#419](https://github.com/greenbone/openvas/pull/419)
+- Use pcap_findalldevs() instead of deprecated function pcap_lookupdev() [#422](https://github.com/greenbone/openvas/pull/422) [#430](https://github.com/greenbone/openvas/pull/430)
+- Add port-range option for openvas-nasl [#431](https://github.com/greenbone/openvas/pull/431)
+- Add test_alive_hosts_only feature. [#456](https://github.com/greenbone/openvas/pull/456)
+- Don't reload the plugins when start a new scan. [#458](https://github.com/greenbone/openvas/pull/458)
+- Drop http feed sync. [#478](https://github.com/greenbone/openvas/pull/478)
+- Add aligned summary to log at scan end. [#496](https://github.com/greenbone/openvas/pull/496)
+- Unify log messages about start/end of scan and of hosts. [#500](https://github.com/greenbone/openvas/pull/500)
+- Use flock to lock the feed lock file. [#507](https://github.com/greenbone/openvas/pull/507)
+- Move alive detection module (Boreas) into gvm-libs [#519](https://github.com/greenbone/openvas/pull/519)
+- Allow to set all legal types of icmp v6 in icmp header in openvas-nasl. [#542](https://github.com/greenbone/openvas/pull/542)
+- The output of the NASL dump_* packet forgery functions was made consistent. [#555](https://github.com/greenbone/openvas/pull/555)
+- Make drop_privileges setting a scanner-only preference. [#557](https://github.com/greenbone/openvas/pull/557)
+- Feed lock path is now configurable. [#574](https://github.com/greenbone/openvas/pull/574)
+
+### Fixed
+- Improve signal handling when update vhosts list. [#425](https://github.com/greenbone/openvas/pull/425)
+- Wait for all children instead of waiting just for one a time. [#428](https://github.com/greenbone/openvas/pull/428)
+- Don't detect MongoDB as a HTTP service. [#447](https://github.com/greenbone/openvas/pull/447)
+- Set status finished and send a message if the port list is invalid. [#453](https://github.com/greenbone/openvas/pull/453)
+- Fix format-truncation warning in GCC 8.2 and later. [#461](https://github.com/greenbone/openvas/pull/461)
+- Clean the new kb when the scan was stopped and the host has not been started. [#494](https://github.com/greenbone/openvas/pull/494)
+- Prevent child deadlock. [#491](https://github.com/greenbone/openvas/pull/491)
+- Memleak fixes for kb_item_get_str(). [#502](https://github.com/greenbone/openvas/pull/502)
+- Fix denied hosts.  [#510](https://github.com/greenbone/openvas/pull/510)
+- Fix openvas-nasl. Add kb key/value for all vhosts. [#533](https://github.com/greenbone/openvas/pull/533)
+- Wait for last plugin to finish before change to other category. [#534](https://github.com/greenbone/openvas/pull/534)
+- Corrected function parameter names in nasl_perror calls. [#539](https://github.com/greenbone/openvas/pull/539)
+- Various updates to the nasl_perror() error texts. [#539](https://github.com/greenbone/openvas/pull/542)
+- Fix icmp checksum calculation in openvas-nasl. [#543](https://github.com/greenbone/openvas/pull/543)
+- Fix ipv6 flow label in nasl_packet_forgery_v6() for openvas-nasl. [#545](https://github.com/greenbone/openvas/pull/545)
+- Fix name of NASL internal IPPROTO_IP variable. [#552](https://github.com/greenbone/openvas/pull/552)
+- Fix byte ordering and wrong PROTO identifier in dump_ipv6_packet() for openvas-nasl. [#549](https://github.com/greenbone/openvas/pull/549)
+- Fix size calculation which lead to alloc error in get_tcp_element() of openvas-nasl. [#546](https://github.com/greenbone/openvas/pull/546)
+- Fix filter out of default 'radio' type preferences [#560](https://github.com/greenbone/openvas/pull/560)
+- Allow group access to lockfile and fix empty timestamp [#562](https://github.com/greenbone/openvas/pull/562)
+
+### Removed
+- Removed "network scan" mode. This includes removal of NASL API methods "scan_phase()" and "network_targets()". Sending a "network_mode=yes" in a scanner configuration will have no effect anymore. [#493](https://github.com/greenbone/openvas/pull/493)
+
+[20.08]: https://github.com/greenbone/openvas/compare/openvas-7.0...openvas-20.08
+
+## [7.0.1]
 
 ### Added
 - Display gvm-libs version in `openvas --version` output [#436](https://github.com/greenbone/openvas/pull/436)
-- Create greenbone-nvt-sync create lock file during feed sync.
-  [#457](https://github.com/greenbone/openvas/pull/457)
-  [#460](https://github.com/greenbone/openvas/pull/460)
-- Extend script_get_preference() to get the value by id. [#471](https://github.com/greenbone/openvas/pull/471)
 
 ### Changed
 - Improve handling of invalid or existent ids of nvt's preference id. [#416](https://github.com/greenbone/openvas/pull/416)
 - Perform a scan even if there are missing plugins. [#439](https://github.com/greenbone/openvas/pull/439)
-- Don't reload the plugins when start a new scan. [#457](https://github.com/greenbone/openvas/pull/457)
-- Use new URL for GCF rsync. [#474](https://github.com/greenbone/openvas/pull/474)
 
 ### Fixed
 - Do not store in memory an empty file received as nvt preference. [#409](https://github.com/greenbone/openvas/pull/409)
@@ -25,12 +112,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix hanging scans. [#423](https://github.com/greenbone/openvas/pull/423)
 - Improve signal handling when update vhosts list. [#426](https://github.com/greenbone/openvas/pull/426)
 - Wait for all children instead of waiting just for one a time. [#429](https://github.com/greenbone/openvas/pull/429)
-- Fix format-truncation warning in GCC 8.2 and later. [#462](https://github.com/greenbone/openvas/pull/462)
+- Release redis connection. [[#452](https://github.com/greenbone/openvas/pull/452)
 
-### Removed
-- Drop HTTP sync [#489](https://github.com/greenbone/openvas/pull/489)
-
-[7.0.1]: https://github.com/greenbone/openvas/compare/v7.0.1...v7.0.0
+[7.0.1]: https://github.com/greenbone/openvas/compare/v7.0.0...openvas-7.0
 
 ## [7.0.0] (2019-10-11)
 
@@ -42,7 +126,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   and the function to close a handler. [#354](https://github.com/greenbone/openvas/pull/354)
 - Add one single config for redis to config/redis-openvas.conf. [#370](https://github.com/greenbone/openvas/pull/370)
 
-### Changes
+### Changed
 - Vendor version is now an option in the config file. [#363](https://github.com/greenbone/openvas/pull/363)
 - The NVT preference format has been changed. [#275](https://github.com/greenbone/openvas/pull/275)
 - Redis supported versions must be 3.2 or higher. [#287](https://github.com/greenbone/openvas/pull/287)
@@ -55,6 +139,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Check cache/feed errors during plugin scheduling. [#358](https://github.com/greenbone/openvas/pull/358)
 - Vendor version is now an option in the config file. [#363](https://github.com/greenbone/openvas/pull/363)
 - Use API for accessing NVTI elements. [#365](https://github.com/greenbone/openvas/pull/365)
+- Allow send_packet() and send_v6packet() to send packets to broadcast/multicast.[#388](https://github.com/greenbone/openvas/pull/388)
+
 
 ### Fixed
 - An issue with stuck scans where only a single plugin is running and is beyond its timeout has been addressed. [#289](https://github.com/greenbone/openvas/pull/289)
@@ -78,7 +164,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [6.0.2] (unreleased)
 
-### Changes
+### Changed
 - The call to wmiexec.py has been replaced with impacket-wmiexec, because the symlink has been added in Debian Stretch with python-impacket 0.9.15-1.
 
 [6.0.2]: https://github.com/greenbone/openvas/compare/v6.0.1...openvas-scanner-6.0
@@ -87,7 +173,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-### Changes
+### Changed
 - Use lowercase for values added from add_host_name(). [#306](https://github.com/greenbone/openvas/pull/306)
 - Do not launch the scan if the nvticache is corrupted. [#309](https://github.com/greenbone/openvas/pull/310)
 - Separate each scan plugin process into its own process group. [#325](https://github.com/greenbone/openvas/pull/325)

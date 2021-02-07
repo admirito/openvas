@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2019 Greenbone Networks GmbH
+# Copyright (C) 2009-2021 Greenbone Networks GmbH
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -21,8 +21,8 @@
 ## Project version
 # The following three variables should be set through the project command once
 # we require CMake >= 3.0
-set (NASL_VERSION_MAJOR 11)
-set (NASL_VERSION_MINOR 0)
+set (NASL_VERSION_MAJOR 20)
+set (NASL_VERSION_MINOR 8)
 set (NASL_VERSION_PATCH 1)
 
 if (PROJECT_BETA_RELEASE)
@@ -32,7 +32,14 @@ else (PROJECT_BETA_RELEASE)
 endif (PROJECT_BETA_RELEASE)
 
 set (NASL_VERSION_STRING "${NASL_VERSION_MAJOR}.${NASL_VERSION_MINOR}${NASL_VERSION_SUFFIX}")
-set (NASL_PACKAGE_VERSION "${NASL_VERSION_STRING}${PROJECT_VERSION_GIT}")
+
+
+if (PROJECT_BETA_RELEASE)
+  set (NASL_PACKAGE_VERSION "${NASL_VERSION_STRING}${PROJECT_VERSION_GIT}")
+else (PROJECT_BETA_RELEASE)
+  set (NASL_PACKAGE_VERSION "${NASL_VERSION_STRING}")
+endif (PROJECT_BETA_RELEASE)
+
 set (NASL_VERSION "${NASL_VERSION_STRING}")
 
 include (FindPkgConfig)
@@ -44,8 +51,8 @@ endif (NOT PKG_CONFIG_FOUND)
 pkg_check_modules (GLIB REQUIRED glib-2.0>=2.42)
 pkg_check_modules (GIO REQUIRED gio-2.0)
 pkg_check_modules (GNUTLS REQUIRED gnutls>=3.2.15)
-pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=11.0.0)
-pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=11.0.0)
+pkg_check_modules (LIBGVM_BASE REQUIRED libgvm_base>=20.8)
+pkg_check_modules (LIBGVM_UTIL REQUIRED libgvm_util>=20.8)
 
 pkg_check_modules (OPENVAS_WMICLIENT libopenvas_wmiclient>=1.0.5)
 pkg_check_modules (OPENVAS_WINCMD libopenvas_wincmd>=1.0.5)
@@ -159,7 +166,7 @@ endif (NOT BISON_FOUND)
 
 set (FILES arc4.c capture_packet.c charcnv.c exec.c genrand.c hmacmd5.c
      iconv.c lint.c md4.c md5.c nasl.c nasl_builtin_find_service.c
-     nasl_builtin_openvas_tcp_scanner.c nasl_builtin_synscan.c nasl_builtin_nmap.c
+     nasl_builtin_openvas_tcp_scanner.c nasl_builtin_synscan.c
      nasl_cmd_exec.c nasl_crypto2.c nasl_snmp.c nasl_ssh.c nasl_cert.c
      nasl_crypto.c nasl_debug.c nasl_func.c nasl_grammar.tab.c nasl_host.c
      nasl_http.c nasl_init.c nasl_lex_ctxt.c nasl_misc_funcs.c nasl_scanner_glue.c
@@ -191,6 +198,7 @@ add_definitions (-DOPENVAS_STATE_DIR="${OPENVAS_STATE_DIR}")
 add_definitions (-DOPENVASLIB_VERSION="${NASL_VERSION_MAJOR}.${NASL_VERSION_MINOR}.${NASL_VERSION_PATCH}")
 add_definitions (-DOPENVAS_SYSCONF_DIR="${OPENVAS_SYSCONF_DIR}")
 add_definitions (-DOPENVAS_NASL_VERSION="${NASL_VERSION}")
+add_definitions (-DOPENVAS_GPG_BASE_DIR="${OPENVAS_GPG_BASE_DIR}")
 
 include_directories (${GLIB_INCLUDE_DIRS}
                      ${GPGME_INCLUDE_DIRS}

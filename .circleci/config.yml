@@ -10,12 +10,12 @@ jobs:
           command: clang-format -i -style=file src/*.{c,h} misc/*.{c,h} nasl/*.{c,h} && git diff --exit-code
   test_units:
     docker:
-      - image: greenbone/build-env-openvas-scanner-master-debian-stretch-gcc-core
+      - image: greenbone/build-env-openvas-scanner-master-debian-buster-gcc-core
     steps:
       - run:
           working_directory: ~/gvm-libs
           name: Checkout gvm-libs
-          command: git clone --depth 1 https://github.com/greenbone/gvm-libs.git -b gvm-libs-11.0
+          command: git clone --depth 1 https://github.com/greenbone/gvm-libs.git -b gvm-libs-20.08
       - run:
           working_directory: ~/gvm-libs
           name: Configure and compile gvm-libs (Release)
@@ -26,12 +26,12 @@ jobs:
           command: mkdir build && cd build/ && cmake -DCMAKE_BUILD_TYPE=Release .. && make tests && CTEST_OUTPUT_ON_FAILURE=1 make test
   build_gcc_core:
     docker:
-      - image: greenbone/build-env-openvas-scanner-master-debian-stretch-gcc-core
+      - image: greenbone/build-env-openvas-scanner-master-debian-buster-gcc-core
     steps:
       - run:
           working_directory: ~/gvm-libs
           name: Checkout gvm-libs
-          command: git clone --depth 1 https://github.com/greenbone/gvm-libs.git -b gvm-libs-11.0
+          command: git clone --depth 1 https://github.com/greenbone/gvm-libs.git -b gvm-libs-20.08
       - run:
           working_directory: ~/gvm-libs
           name: Configure and compile gvm-libs
@@ -42,12 +42,12 @@ jobs:
           command: mkdir build && cd build/ && cmake -DCMAKE_BUILD_TYPE=Release .. && make install
   scan_build:
     docker:
-      - image: greenbone/build-env-openvas-scanner-master-debian-stretch-clang-core
+      - image: greenbone/build-env-openvas-scanner-master-debian-buster-clang-core
     steps:
       - run:
           working_directory: ~/gvm-libs
           name: Checkout gvm-libs
-          command: git clone --depth 1 https://github.com/greenbone/gvm-libs.git -b gvm-libs-11.0
+          command: git clone --depth 1 https://github.com/greenbone/gvm-libs.git -b gvm-libs-20.08
       - run:
           working_directory: ~/gvm-libs
           name: Configure and compile gvm-libs

@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -35,7 +35,7 @@ void pluginlaunch_wait (kb_t);
 void pluginlaunch_wait_for_free_process (kb_t);
 
 void
-pluginlaunch_stop ();
+pluginlaunch_stop (void);
 
 int
 plugin_launch (struct scan_globals *, struct scheduler_plugin *,

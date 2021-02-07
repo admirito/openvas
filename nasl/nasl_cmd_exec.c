@@ -93,7 +93,7 @@ pread_streams (int fdout, int fderr)
   return g_string_free (str, FALSE);
 }
 
-/** @todo Supspects to glib replacements, all path related stuff. */
+/** @todo Suspects to glib replacements, all path related stuff. */
 tree_cell *
 nasl_pread (lex_ctxt *lexic)
 {
@@ -191,7 +191,7 @@ nasl_pread (lex_ctxt *lexic)
     {
       if (error)
         {
-          g_warning ("%s: %s", __FUNCTION__, error->message);
+          g_warning ("%s: %s", __func__, error->message);
           g_error_free (error);
         }
       goto finish_pread;

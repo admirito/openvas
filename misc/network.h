@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Based on work Copyright (C) 1998 - 2007 Tenable Network Security, Inc.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -49,6 +49,7 @@ typedef enum openvas_encaps
   OPENVAS_ENCAPS_TLSv1,
   OPENVAS_ENCAPS_TLSv11,
   OPENVAS_ENCAPS_TLSv12,
+  OPENVAS_ENCAPS_TLSv13,
   OPENVAS_ENCAPS_TLScustom, /* SSL/TLS using custom priorities.  */
   OPENVAS_ENCAPS_MAX,
 } openvas_encaps_t;

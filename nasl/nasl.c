@@ -1,4 +1,5 @@
-/* Based on work Copyright (C) 2002 - 2005 Tenable Network Security
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
+ * Based on work Copyright (C) 2002 - 2005 Tenable Network Security
  *
  * SPDX-License-Identifier: GPL-2.0-only
  *
@@ -171,6 +172,7 @@ main (int argc, char **argv)
   static gchar *trace_file = NULL;
   static gchar *config_file = NULL;
   static gchar *source_iface = NULL;
+  static gchar *port_range = NULL;
   static gboolean with_safe_checks = FALSE;
   static gboolean signing_mode = FALSE;
   static gchar *include_dir = NULL;
@@ -211,6 +213,8 @@ main (int argc, char **argv)
      "Enable TLS debugging at <level>", "<level>"},
     {"kb", 'k', 0, G_OPTION_ARG_STRING_ARRAY, &kb_values,
      "Set KB key to value. Can be used multiple times", "<key=value>"},
+    {"port-range", 'r', 0, G_OPTION_ARG_STRING, &port_range,
+     "Set the <port-range> used by nasl scripts. ", "<port-range>"},
     {G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &nasl_filenames,
      "Absolute path to one or more nasl scripts", "NASL_FILE..."},
     {NULL, 0, 0, 0, NULL, NULL, NULL}};
@@ -240,7 +244,7 @@ main (int argc, char **argv)
       else
         putchar ('\n');
       printf ("Copyright (C) 2002 - 2004 Tenable Network Security\n");
-      printf ("Copyright (C) 2013 Greenbone Networks GmbH\n\n");
+      printf ("Copyright (C) 2021 Greenbone Networks GmbH\n\n");
       exit (0);
     }
   if (nasl_debug)
@@ -332,6 +336,12 @@ main (int argc, char **argv)
   if (prefs_get ("vendor_version") != NULL)
     vendor_version_set (prefs_get ("vendor_version"));
 
+  if (port_range != NULL)
+    {
+      prefs_set ("port_range", port_range);
+      g_free (port_range);
+    }
+
   while ((host = gvm_hosts_next (hosts)))
     {
       struct in6_addr ip6;
@@ -374,16 +384,18 @@ main (int argc, char **argv)
             }
           if (kb_values)
             {
-              while (*kb_values)
+              gchar **kb_values_aux = kb_values;
+              while (*kb_values_aux)
                 {
-                  gchar **splits = g_strsplit (*kb_values, "=", -1);
+                  gchar **splits = g_strsplit (*kb_values_aux, "=", -1);
                   if (splits[2] || !splits[1])
                     {
-                      fprintf (stderr, "Erroneous --kb entry %s\n", *kb_values);
+                      fprintf (stderr, "Erroneous --kb entry %s\n",
+                               *kb_values_aux);
                       exit (1);
                     }
                   kb_item_add_str_unique (kb, splits[0], splits[1], 0);
-                  kb_values++;
+                  kb_values_aux++;
                   g_strfreev (splits);
                 }
             }

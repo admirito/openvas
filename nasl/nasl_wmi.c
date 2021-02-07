@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Copyright (C) 2009-2021 Greenbone Networks GmbH
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -244,12 +244,20 @@ nasl_wmi_query (lex_ctxt *lexic)
   retc->size = 0;
 
   value = wmi_query (handle, query, &res);
-
-  if ((value == -1) || (res == NULL))
+  if ((value == -1) && (res != NULL))
     {
-      g_message ("wmi_query: WMI query failed '%s'", query);
+      g_message ("wmi_query: WMI query failed '%s' with error: '%s'", query,
+                 res);
+      g_free (res);
       return NULL;
     }
+  else if ((value == -1) && (res == NULL))
+    {
+      g_debug ("wmi_query: WMI query failed '%s'", query);
+      return NULL;
+    }
+  else if (res == NULL)
+    return NULL;
 
   retc->x.str_val = strdup (res);
   retc->size = strlen (res);
@@ -346,11 +354,21 @@ nasl_wmi_query_rsop (lex_ctxt *lexic)
   retc->size = 0;
 
   value = wmi_query_rsop (handle, query, &res);
-  if ((value == -1) || (res == NULL))
+  if ((value == -1) && (res != NULL))
     {
-      g_message ("wmi_query_rsop: WMI query failed");
+      g_message ("wmi_query_rsop: WMI query failed '%s' with error: '%s'",
+                 query, res);
+      g_free (res);
       return NULL;
     }
+  else if ((value == -1) && (res == NULL))
+    {
+      g_debug ("wmi_query_rsop: WMI query failed");
+      return NULL;
+    }
+  else if (res == NULL)
+    return NULL;
+
   retc->x.str_val = strdup (res);
   retc->size = strlen (res);
 
@@ -803,7 +821,7 @@ nasl_wmi_reg_set_dword_val (lex_ctxt *lexic)
   char *key = get_str_var_by_name (lexic, "key"); // REGISTRY KEY
   char *val_name =
     get_str_var_by_name (lexic, "val_name");      // REGISTRY VALUE NAME
-  char *val = get_str_var_by_name (lexic, "val"); // REGISTERY VALUE TO SET
+  char *val = get_str_var_by_name (lexic, "val"); // REGISTRY VALUE TO SET
 
   uint32_t val1;
   int value;
@@ -853,7 +871,7 @@ nasl_wmi_reg_set_qword_val (lex_ctxt *lexic)
   char *key = get_str_var_by_name (lexic, "key"); // REGISTRY KEY
   char *val_name =
     get_str_var_by_name (lexic, "val_name");      // REGISTRY VALUE NAME
-  char *val = get_str_var_by_name (lexic, "val"); // REGISTERY VALUE TO SET
+  char *val = get_str_var_by_name (lexic, "val"); // REGISTRY VALUE TO SET
 
   uint64_t val1;
   int value;
@@ -903,7 +921,7 @@ nasl_wmi_reg_set_ex_string_val (lex_ctxt *lexic)
   char *key = get_str_var_by_name (lexic, "key"); // REGISTRY KEY
   char *val_name =
     get_str_var_by_name (lexic, "val_name");      // REGISTRY VALUE NAME
-  char *val = get_str_var_by_name (lexic, "val"); // REGISTERY VALUE TO SET
+  char *val = get_str_var_by_name (lexic, "val"); // REGISTRY VALUE TO SET
 
   int value;
 
@@ -915,7 +933,7 @@ nasl_wmi_reg_set_ex_string_val (lex_ctxt *lexic)
   if (value == -1)
     {
       g_message (
-        "nasl_wmi_reg_set_ex_string_val: WMI registery set operation failed");
+        "nasl_wmi_reg_set_ex_string_val: WMI registry set operation failed");
       return NULL;
     }
   return retc;
@@ -945,7 +963,7 @@ nasl_wmi_reg_set_string_val (lex_ctxt *lexic)
   char *key = get_str_var_by_name (lexic, "key"); // REGISTRY KEY
   char *val_name =
     get_str_var_by_name (lexic, "val_name");      // REGISTRY VALUE NAME
-  char *val = get_str_var_by_name (lexic, "val"); // REGISTERY VALUE TO SET
+  char *val = get_str_var_by_name (lexic, "val"); // REGISTRY VALUE TO SET
 
   int value;
 
@@ -956,7 +974,7 @@ nasl_wmi_reg_set_string_val (lex_ctxt *lexic)
 
   if (value == -1)
     {
-      g_message ("nasl_wmi_reg_set_string_val: WMI registery"
+      g_message ("nasl_wmi_reg_set_string_val: WMI registry"
                  " set operation failed");
       return NULL;
     }
@@ -993,7 +1011,7 @@ nasl_wmi_reg_create_key (lex_ctxt *lexic)
 
   if (value == -1)
     {
-      g_message ("nasl_wmi_reg_create_key: WMI registery key create"
+      g_message ("nasl_wmi_reg_create_key: WMI registry key create"
                  " operation failed");
       return NULL;
     }
@@ -1032,7 +1050,7 @@ nasl_wmi_reg_delete_key (lex_ctxt *lexic)
 
   if (value == -1)
     {
-      g_message ("nasl_wmi_reg_delete_key: WMI registery key"
+      g_message ("nasl_wmi_reg_delete_key: WMI registry key"
                  " delete operation failed");
       return NULL;
     }

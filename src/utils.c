@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -163,7 +163,7 @@ get_max_hosts_number (void)
     }
   else
     max_hosts = global_max_hosts;
-  return max_hosts;
+  return (max_hosts);
 }
 
 /**
@@ -194,7 +194,7 @@ get_max_checks_number (void)
     }
   else
     max_checks = global_max_checks;
-  return max_checks;
+  return (max_checks);
 }
 
 /**
@@ -213,7 +213,8 @@ process_alive (pid_t pid)
   return kill (pid, 0) == 0;
 }
 
-int data_left (soc) int soc;
+int
+data_left (int soc)
 {
   int data = 0;
   ioctl (soc, FIONREAD, &data);
@@ -255,6 +256,7 @@ is_scanner_only_pref (const char *pref)
       || !strcmp (pref, "log_plugins_name_at_load")
       || !strcmp (pref, "nasl_no_signature_check")
       || !strcmp (pref, "vendor_version")
+      || !strcmp (pref, "drop_privileges")
       /* Preferences starting with sys_ are scanner-side only. */
       || !strncmp (pref, "sys_", 4))
     return 1;

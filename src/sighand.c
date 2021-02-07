@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -100,15 +100,14 @@ void (*openvas_signal (int signum, void (*handler) (int))) (int)
 }
 
 void
-sighand_chld (pid_t pid)
+sighand_chld (int sig)
 {
-  int status;
-
-  waitpid (pid, &status, WNOHANG);
+  (void) sig;
+  waitpid (-1, NULL, WNOHANG);
 }
 
 static void
-print_trace ()
+print_trace (void)
 {
   void *array[10];
   int ret = 0, left;

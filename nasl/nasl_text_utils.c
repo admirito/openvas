@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Based on work Copyright (C) 2002 - 2004 Tenable Network Security
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -465,7 +465,8 @@ nasl_ereg (lex_ctxt *lexic)
 
   if (regcomp (&re, pattern, REG_EXTENDED | REG_NOSUB | copt))
     {
-      nasl_perror (lexic, "ereg() : regcomp() failed\n");
+      nasl_perror (lexic, "ereg() : regcomp() failed for pattern '%s'.\n",
+                   pattern);
       return NULL;
     }
 
@@ -541,7 +542,7 @@ _regreplace (const char *pattern, const char *replace, const char *string,
 
       if (err && err != REG_NOMATCH)
         {
-          return NULL;
+          return (NULL);
         }
       if (!err)
         {
@@ -639,7 +640,7 @@ _regreplace (const char *pattern, const char *replace, const char *string,
   buf[new_l] = '\0';
   regfree (&re);
   /* whew. */
-  return buf;
+  return (buf);
 }
 
 tree_cell *
@@ -722,7 +723,8 @@ nasl_egrep (lex_ctxt *lexic)
         bzero (&re, sizeof (re));
         if (regcomp (&re, pattern, REG_EXTENDED | copt))
           {
-            nasl_perror (lexic, "egrep() : regcomp() failed\n");
+            nasl_perror (
+              lexic, "egrep() : regcomp() failed for pattern '%s'.\n", pattern);
             return NULL;
           }
 
@@ -806,7 +808,8 @@ nasl_eregmatch (lex_ctxt *lexic)
 
   if (regcomp (&re, pattern, REG_EXTENDED | copt))
     {
-      nasl_perror (lexic, "regmatch() : regcomp() failed\n");
+      nasl_perror (lexic, "regmatch() : regcomp() failed for pattern '%s'.\n",
+                   pattern);
       return NULL;
     }
 
@@ -1199,7 +1202,7 @@ nasl_strstr (lex_ctxt *lexic)
  *
  * Returning NULL for "not found" is dangerous as automatic conversion to
  * to integer would change it into 0.
- * So we return -1.
+ * So we return (-1).
  *
  * @return -1 if string not found, otherwise index of substring.
  *

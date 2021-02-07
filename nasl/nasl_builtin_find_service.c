@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Based on work Copyright (C) 2002 Renaud Deraison
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -401,7 +401,7 @@ mark_sphinxql (struct script_infos *desc, int port)
 {
   register_service (desc, port, "sphinxql");
   post_log (oid, desc, port,
-            "A Sphinx search server (MySQL listener)"
+            "A Sphinx search server (MySQL listener) "
             "seems to be running on this port");
 }
 
@@ -450,7 +450,8 @@ mark_wild_shell (struct script_infos *desc, int port)
 
   post_alarm (
     oid, desc, port,
-    "A shell seems to be running on this port ! (this is a possible backdoor)");
+    "A shell seems to be running on this port ! (this is a possible backdoor)",
+    NULL);
 }
 
 void
@@ -497,7 +498,7 @@ void
 mark_netbus_server (struct script_infos *desc, int port)
 {
   register_service (desc, port, "netbus");
-  post_alarm (oid, desc, port, "NetBus is running on this port");
+  post_alarm (oid, desc, port, "NetBus is running on this port", NULL);
 }
 
 void
@@ -1030,7 +1031,7 @@ mark_sub7_server (struct script_infos *desc, int port, int trp)
   register_service (desc, port, "sub7");
   snprintf (ban, sizeof (ban), "The Sub7 trojan is running on this port%s",
             get_encaps_through (trp));
-  post_alarm (oid, desc, port, ban);
+  post_alarm (oid, desc, port, ban, NULL);
 }
 
 /*
@@ -1107,7 +1108,7 @@ mark_fssniffer (struct script_infos *desc, int port, int trp)
     snprintf (ban, sizeof (ban),
               "A FsSniffer backdoor seems to be running on this port%s",
               get_encaps_through (trp));
-    post_alarm (oid, desc, port, ban);
+    post_alarm (oid, desc, port, ban, NULL);
   }
 }
 
@@ -1448,6 +1449,13 @@ mark_direct_connect_hub (struct script_infos *desc, int port, int trp)
   snprintf (str, sizeof (str), "A Direct Connect Hub is running on this port%s",
             get_encaps_through (trp));
   post_log (oid, desc, port, str);
+}
+
+static void
+mark_mongodb (struct script_infos *desc, int port)
+{
+  register_service (desc, port, "mongodb");
+  post_log (oid, desc, port, "A MongoDB server is running on this port");
 }
 
 /*
@@ -1840,7 +1848,13 @@ plugin_do_run (struct script_infos *desc, GSList *h, int test_ssl)
                           && !(strncmp (line, "http/1.0 403 forbidden",
                                         strlen ("http/1.0 403 forbidden"))
                                  == 0
-                               && strstr (buffer, "server: adsubtract")
+                               && strstr (buffer, "server: adsubtract") != NULL)
+                          && !(strstr (
+                                 buffer,
+                                 "it looks like you are trying to access "
+                                 "mongodb over http on the native driver port.")
+                                 != NULL
+                               && strstr (buffer, "content-length: 84")
                                     != NULL))
                         mark_http_server (desc, port, banner, trp);
                     }
@@ -2221,6 +2235,12 @@ plugin_do_run (struct script_infos *desc, GSList *h, int test_ssl)
                     mark_socks_proxy (desc, port, 5);
                   else if (banner[0] == 0 && banner[1] >= 90 && banner[1] <= 93)
                     mark_socks_proxy (desc, port, 4);
+                  else if (strstr (
+                             buffer,
+                             "it looks like you are trying to access mongodb "
+                             "over http on the native driver port.")
+                           != NULL)
+                    mark_mongodb (desc, port);
                   else
                     unindentified_service = !flg;
                   g_free (line);
@@ -2336,7 +2356,7 @@ plugin_do_run (struct script_infos *desc, GSList *h, int test_ssl)
     }
   g_free (http_get);
 
-  return 0;
+  return (0);
 }
 
 #define MAX_SONS 128

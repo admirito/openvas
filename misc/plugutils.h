@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Based on work Copyright (C) 1998 - 2007 Tenable Network Security, Inc.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -88,29 +88,36 @@ plug_create_from_nvti_and_prefs (const nvti_t *);
 
 void
 proto_post_alarm (const char *, struct script_infos *, int, const char *,
-                  const char *);
+                  const char *, const char *);
 
 void
-post_alarm (const char *, struct script_infos *, int, const char *);
+post_alarm (const char *, struct script_infos *, int, const char *,
+            const char *);
 
 void
-post_alarm_udp (struct script_infos *, int, const char *);
+post_alarm_udp (struct script_infos *, int, const char *, const char *);
 
 #define post_alarm_tcp post_alarm
 
 void
 proto_post_error (const char *, struct script_infos *, int, const char *,
-                  const char *);
+                  const char *, const char *);
 void
-post_error (const char *, struct script_infos *, int, const char *);
+post_error (const char *, struct script_infos *, int, const char *,
+            const char *);
 
 #define post_error_tcp post_error
 
 void
 proto_post_log (const char *, struct script_infos *, int, const char *,
-                const char *);
+                const char *, const char *);
+
 void
 post_log (const char *, struct script_infos *, int, const char *);
+
+void
+post_log_with_uri (const char *, struct script_infos *, int, const char *,
+                   const char *);
 
 #define post_log_tcp post_log
 

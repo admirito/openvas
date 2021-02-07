@@ -1,4 +1,4 @@
-/* Portions Copyright (C) 2009-2019 Greenbone Networks GmbH
+/* Portions Copyright (C) 2009-2021 Greenbone Networks GmbH
  * Portions Copyright (C) 2006 Software in the Public Interest, Inc.
  * Based on work Copyright (C) 1998 - 2006 Tenable Network Security, Inc.
  *
@@ -202,7 +202,7 @@ hosts_stop_host (struct host *h)
   if (h == NULL)
     return -1;
 
-  g_message ("Stopping host %s scan", h->name);
+  g_message ("Stopping host %s scan (pid: %d)", h->name, h->pid);
   kill (h->pid, SIGUSR1);
   return 0;
 }
@@ -240,15 +240,22 @@ hosts_read_data (void)
 
   while (h)
     {
+      char *host_deny = NULL;
+
       if (!h->ip)
         {
           /* Scan started. */
           h->ip = kb_item_get_str (h->host_kb, "internal/ip");
           if (h->ip)
             host_set_time (h->host_kb, "internal/start_time");
+          else
+            /* internal/host_deny is set during check_host_authorization() */
+            host_deny = kb_item_get_str (h->host_kb, "internal/host_deny");
         }
-      if (h->ip)
+
+      if (h->ip || host_deny)
         {
+          g_free (host_deny);
           if (kill (h->pid, 0) < 0) /* Process is dead */
             {
               if (!h->prev)
