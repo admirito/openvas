@@ -2,7 +2,7 @@ Source: openvas
 Section: admin
 Priority: optional
 Maintainer: Mohammad Razavi <mrazavi64@gmail.com>
-Build-Depends: debhelper-compat (= 12), po-debconf, doxygen, xmltoman, cmake, pkg-config, libglib2.0-dev, libgcrypt20-dev, libgnutls28-dev, libpcap-dev, libgpgme-dev, libssh-dev, libksba-dev, bison, flex, libgvm-dev (>= 11.0.1), libopenvas-smb-dev
+Build-Depends: debhelper-compat (= 12), po-debconf, doxygen, xmltoman, cmake, pkg-config, libglib2.0-dev, libgcrypt20-dev, libgnutls28-dev, libpcap-dev, libgpgme-dev, libssh-gcrypt-dev, libksba-dev, bison, flex, libsnmp-dev, libgvm-dev (>= 20.8.1), libopenvas-smb-dev
 Standards-Version: 4.4.1
 Homepage: https://community.greenbone.net/
 Vcs-Git: https://github.com/admirito/openvas.git
@@ -10,7 +10,7 @@ Vcs-Browser: https://github.com/admirito/openvas
 
 Package: openvas
 Architecture: any
-Pre-Depends: gnutls-bin (>= 3.0.11), redis-server
+Pre-Depends: gnutls-bin (>= 3.0.11), redis-server, adduser
 Depends: lsb-base, ${shlibs:Depends}, ${misc:Depends}
 Recommends: nmap, rsync, curl, openvas-smb
 Conflicts: openvas-scanner, openvas9-scanner, libopenvas9, libopenvas9-dev

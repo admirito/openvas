@@ -27,10 +27,31 @@ case "$1" in
 		if [ ! -f /etc/redis/redis.conf ]; then
 		    echo "/etc/redis/redis.conf doesn't exist. Please configure redis unix socket manually."
 		else
-		    ((grep -q "^\s*unixsocket\s\+" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocket /var/run/redis/redis.sock" /etc/redis/redis.conf) && grep -q "^\s*unixsocketperm" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocketperm 755" /etc/redis/redis.conf) && invoke-rc.d --quiet redis-server restart || true
+		    ((grep -q "^\s*unixsocket\s\+" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocket /var/run/redis/redis.sock" /etc/redis/redis.conf) && grep -q "^\s*unixsocketperm" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocketperm 775" /etc/redis/redis.conf) && invoke-rc.d --quiet redis-server restart || true
 		fi
 	    fi
 	fi
+
+        if ! getent passwd gvm >/dev/null; then
+            addgroup --system gvm
+            adduser --system --home /var/lib/gvm --ingroup gvm gvm
+        fi
+
+	chown gvm:gvm /var/lib/gvm /var/log/gvm || true
+	chown gvm:gvm /var/lib/openvas /var/lib/openvas/gnupg /var/lib/openvas/plugins || true
+
+	# this is just for upgrading from the verion 11 (which old
+	# files has the root:root as the owner) and could be removed
+	# in later versions
+	find /var/lib/openvas -user root -group root | xargs -n 64 chown gvm:gvm >/dev/null 2>&1 || true
+	[ -e /var/log/gvm/openvas.log ] && chown gvm:gvm /var/log/gvm/openvas.log || true
+
+        if getent group redis >/dev/null; then
+	    adduser gvm redis
+	else
+	    echo "redis group not found, so gvm user cannot be added to it. You have to make sure gvm user can access redis unix socket." 1>&2
+        fi
+
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
