@@ -4,9 +4,13 @@ Default: true
 _Description: Do you want to enable redis unix socket in /etc/redis/redis.conf?
  Greenbone vulnerability scanner require redis database to store
  data. It will connect to the database with a unix socket at
- /var/run/redis/redis.sock.
+ /run/redis/redis.sock.
  .
  If you agree, the installation process will enable redis unix socket
- at this address automatically, by updateing /etc/redis/redis.conf.
+ at this address automatically, by updateing
+ /etc/redis/redis.conf. Also the default "databases" value may be
+ updated.
  .
- Otherwise, you have to manually update your /etc/redis/redis.conf.
+ Otherwise, you have to manually update your /etc/redis/redis.conf. An
+ example redis configuration provided by GVM developers is available
+ at /etc/openvas/redis.conf.example.

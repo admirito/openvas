@@ -11,10 +11,14 @@ override_dh_clean:
 	dh_clean
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DLOCALSTATEDIR=/var -DOPENVAS_RUN_DIR=/var/run/gvm -DSYSCONFDIR=/etc -DLIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
+	dh_auto_configure -- -DLOCALSTATEDIR=/var -DOPENVAS_RUN_DIR=/run/gvm -DSYSCONFDIR=/etc -DLIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
 
 override_dh_installchangelogs:
 	dh_installchangelogs -k CHANGELOG.md
+
+override_dh_auto_install:
+	dh_auto_install
+	sed 's|^unixsocket .*|unixsocket /run/redis/redis.sock|' config/redis-openvas.conf > debian/openvas/etc/openvas/redis.conf.example
 
 override_dh_auto_test:
 	true

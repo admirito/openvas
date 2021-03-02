@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: openvas\n"
 "Report-Msgid-Bugs-To: openvas@packages.debian.org\n"
-"POT-Creation-Date: 2019-03-07 13:23+0330\n"
+"POT-Creation-Date: 2021-03-02 13:23+0330\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -28,7 +28,7 @@ msgstr ""
 #: ../templates:1001
 msgid ""
 "Greenbone vulnerability scanner require redis database to store data. It "
-"will connect to the database with a unix socket at /var/run/redis/redis.sock."
+"will connect to the database with a unix socket at /run/redis/redis.sock."
 msgstr ""
 
 #. Type: boolean
@@ -36,11 +36,15 @@ msgstr ""
 #: ../templates:1001
 msgid ""
 "If you agree, the installation process will enable redis unix socket at this "
-"address automatically, by updateing /etc/redis/redis.conf."
+"address automatically, by updateing /etc/redis/redis.conf. Also the default "
+"\"databases\" value may be updated."
 msgstr ""
 
 #. Type: boolean
 #. Description
 #: ../templates:1001
-msgid "Otherwise, you have to manually update your /etc/redis/redis.conf."
+msgid ""
+"Otherwise, you have to manually update your /etc/redis/redis.conf. An "
+"example redis configuration provided by GVM developers is available at /etc/"
+"openvas/redis.conf.example."
 msgstr ""

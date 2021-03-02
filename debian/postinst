@@ -27,7 +27,9 @@ case "$1" in
 		if [ ! -f /etc/redis/redis.conf ]; then
 		    echo "/etc/redis/redis.conf doesn't exist. Please configure redis unix socket manually."
 		else
-		    ((grep -q "^\s*unixsocket\s\+" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocket /var/run/redis/redis.sock" /etc/redis/redis.conf) && grep -q "^\s*unixsocketperm" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocketperm 775" /etc/redis/redis.conf) && invoke-rc.d --quiet redis-server restart || true
+                    sed -i "s/^databases \([0-9][0-9]\?\)$/# Updated by openvas post installation (previous value was \1)\ndatabases 1025/" /etc/redis/redis.conf || true
+
+		    ((grep -q "^\s*unixsocket\s\+" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocket /run/redis/redis.sock" /etc/redis/redis.conf) && grep -q "^\s*unixsocketperm" /etc/redis/redis.conf >/dev/null 2>&1 || sed -i "\$a#Added by openvas post installation\nunixsocketperm 775" /etc/redis/redis.conf) && invoke-rc.d --quiet redis-server restart || true
 		fi
 	    fi
 	fi
